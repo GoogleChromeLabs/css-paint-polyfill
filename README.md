@@ -1,4 +1,10 @@
-# CSS Paint Polyfill
+<p align="center">
+  <img src="https://i.imgur.com/Nat1PNX.png" width="300" height="300" alt="histore">
+  <h1 align="center">
+  	Houdini's CSS Paint Polyfill
+	<a href="https://www.npmjs.org/package/css-paint-polyfill"><img src="https://img.shields.io/npm/v/css-paint-polyfill.svg?style=flat" alt="npm"></a>
+  </h1>
+</p>
 
 This is a polyfill for the [CSS Paint API].
 
