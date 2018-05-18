@@ -1,0 +1,40 @@
+{
+  "name": "css-paint-polyfill",
+  "version": "1.0.0",
+  "description": "",
+  "source": "src/index.js",
+  "main": "dist/css-paint-polyfill.js",
+  "scripts": {
+    "build": "microbundle -f iife && cp -r demo dist/",
+    "start": "concurrently serve \"microbundle watch -f iife\"",
+    "test": "eslint src",
+    "deploy": "cp -rf demo build && cp -r dist build/ && surge build https://css-paint-polyfill.surge.sh && rm -rf build"
+  },
+  "eslintConfig": {
+    "extends": "eslint-config-developit",
+    "rules": {
+      "prefer-spread": 0
+    }
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "keywords": [
+    "paint",
+    "worklet",
+    "polyfill"
+  ],
+  "author": "Google Chrome Developers <chromium-dev@google.com>",
+  "license": "Apache 2.0",
+  "devDependencies": {
+    "concurrently": "^3.5.1",
+    "eslint": "^4.17.0",
+    "eslint-config-developit": "^1.1.1",
+    "microbundle": "^0.4.3",
+    "serve": "^6.4.9"
+  },
+  "dependencies": {
+    "transpiler-lite": "git+https://gist.github.com/781ef9620da8a30228b9f0c6e21fa7f6.git"
+  }
+}
