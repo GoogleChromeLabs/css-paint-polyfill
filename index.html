@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<link rel="stylesheet" href="style.css">
+	</head>
+	<body>
+		<p>
+			This is a demonstration of the <a href="https://developers.google.com/web/updates/2018/01/paintapi">CSS Paint</a> Polyfill.
+		</p>
+
+		<p style="font-style: italic;">
+			<strong>Note:</strong> Currently, both Chrome and this polyfill run Paint Worklets in an isolated context on the main thread.
+		</p>
+
+		<div>
+			<strong>Source:</strong>
+			<pre><a href="./demo.js">demo.js</a></pre>
+			<pre><a href="./ripple-worklet.js">ripple-worklet.js</a></pre>
+			<pre><a href="./style.css">style.css</a></pre>
+		</div>
+
+		<img src="https://i.imgur.com/Nat1PNX.png" style="position: absolute; left: 340px; top: 220px; width: 512px;">
+
+		<button class="ripple">Click me!</button>
+		<br>
+		<button class="ripple spin">Dark &amp; Faster</button>
+		<br>
+		<button class="ripple">Custom Colors</button>
+
+		<script src="https://cdn.rawgit.com/developit/781ef9620da8a30228b9f0c6e21fa7f6/raw/b228b3fadb2284957d040057e6701a49f522198f/transpiler-lite.umd.js"></script>
+		<script src="../dist/css-paint-polyfill.js"></script>
+
+		<script src="demo.js"></script>
+	</body>
+</html>
