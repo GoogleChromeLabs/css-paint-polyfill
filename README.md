@@ -15,7 +15,7 @@ Performance is quite good in Firefox and Safari courtesy of `-webkit-canvas()` a
 ```html
 <script src="css-paint-polyfill.js"></script>
 <!-- or: -->
-<script src="//unpkg.com/css-paint-polyfill/dist/css-paint-polyfill.js"></script>
+<script src="https://unpkg.com/css-paint-polyfill/dist/css-paint-polyfill.js"></script>
 ```
 
 Or with a bundler:
@@ -27,7 +27,7 @@ import 'css-paint-polyfill';
 ... or with ES Modules on the web:
 
 ```js
-import('//unpkg.com/css-paint-polyfill/dist/css-paint-polyfill.js');
+import('https://unpkg.com/css-paint-polyfill/dist/css-paint-polyfill.js');
 ```
 
 # To-Do
