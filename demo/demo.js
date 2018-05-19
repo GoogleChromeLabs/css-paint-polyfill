@@ -28,7 +28,10 @@ CSS.paintWorklet.addModule('./ripple-worklet.js');
 
 if (!window.performance) window.performance = { now: Date.now.bind(Date) };
 
-if (!window.requestAnimationFrame) window.requestAnimationFrame = function(cb) { return setTimeout(doAnim, 16, cb); };
+if (!window.requestAnimationFrame) {
+	window.requestAnimationFrame = function(cb) { return setTimeout(doAnim, 16, cb); };
+	window.cancelAnimationFrame = function(req) { clearTimeout(req); }
+}
 function doAnim(cb) { cb(performance.now()); }
 
 function ripple(button, evt) {
