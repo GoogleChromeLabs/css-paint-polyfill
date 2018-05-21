@@ -8,7 +8,7 @@
     "build": "microbundle -f iife && cp -r demo dist/",
     "start": "concurrently serve \"microbundle watch -f iife\"",
     "test": "eslint src",
-    "deploy": "cp -rf demo build && cp -r dist build/ && surge build https://css-paint-polyfill.surge.sh && rm -rf build"
+    "deploy": "cp -rf demo build && cp -r dist build/ && sed -i '' 's/\\.\\.\\/dist/dist/' build/index.html && gh-pages -d build && rm -rf build"
   },
   "eslintConfig": {
     "extends": "eslint-config-developit",
@@ -31,6 +31,7 @@
     "concurrently": "^3.5.1",
     "eslint": "^4.17.0",
     "eslint-config-developit": "^1.1.1",
+    "gh-pages": "^1.1.0",
     "microbundle": "^0.4.3",
     "serve": "^6.4.9"
   },
