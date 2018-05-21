@@ -8,7 +8,7 @@
 
 This is a polyfill for the [CSS Paint API].
 
-Performance is quite good in Firefox and Safari courtesy of `-webkit-canvas()` and `-moz-element()`. For the remaining browsers, framerate is govered by Canvas `toDataURL()` / `toBlob()` speed.
+Performance is quite good in Firefox and Safari courtesy of `-webkit-canvas()` and `-moz-element()`. For the remaining browsers, framerate is governed by Canvas `toDataURL()` / `toBlob()` speed.
 
 # Usage
 
