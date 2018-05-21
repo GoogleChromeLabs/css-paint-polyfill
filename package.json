@@ -23,7 +23,12 @@
   "keywords": [
     "paint",
     "worklet",
-    "polyfill"
+    "polyfill",
+    "houdini",
+    "custom paint",
+    "css paint",
+    "paint worklet",
+    "worklet"
   ],
   "author": "Google Chrome Developers <chromium-dev@google.com>",
   "license": "Apache 2.0",
