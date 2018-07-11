@@ -62,6 +62,7 @@ function registerPaint(name, Painter, worklet) {
 		bit: 0,
 		instances: []
 	};
+	update();
 }
 
 function getPainter(name) {
@@ -111,6 +112,15 @@ function paintRuleWalker(rule, context) {
 	else {
 		cached = trackedRules[key] = { key, selector, cssText, properties: {}, rule };
 		context.toProcess.push(cached.selector);
+	}
+}
+
+function walk(node, iterator) {
+	iterator(node);
+	let child = node.firstElementChild;
+	while (child) {
+		iterator(child);
+		child = child.nextElementSibling;
 	}
 }
 
@@ -202,7 +212,7 @@ function replaceRule(rule, newRule) {
 }
 
 // Replace paint(id) with url(data:image/paint-id) for a newly detected stylesheet
-function processNewSheet(node, removeUnmatchedRules) {
+function processNewSheet(node) {
 	if (node.href) {
 		fetchText(node.href, processRemoteSheet);
 		return false;
@@ -246,7 +256,9 @@ let updateQueue = [];
 function queueUpdate(element) {
 	if (element.$$paintPending===true) return;
 	element.$$paintPending = true;
-	if (updateQueue.push(element) === 1) defer(processUpdateQueue);
+	if (updateQueue.indexOf(element) === -1 && updateQueue.push(element) === 1) {
+		defer(processUpdateQueue);
+	}
 }
 function processUpdateQueue() {
 	let el;
@@ -381,13 +393,22 @@ function updateElement(element, computedStyle) {
 			let painterName = token[4] || token[5];
 			let currentUri = token[3];
 			let painter = getPainter(painterName);
-			if (painter.Painter.inputProperties) {
-				observedProperties.push.apply(observedProperties, painter.Painter.inputProperties);
+			let contextOptions = painter && painter.Painter.contextOptions || {};
+			let equivalentDpr = contextOptions.scaling === false ? 1 : dpr;
+
+			let inst;
+			if (painter) {
+				// if (!painter) {
+				// 	element.$$paintPending = true;
+				// 	overridesStylesheet.disabled = false;
+				// 	// setTimeout(maybeUpdateElement, 10, element);
+				// 	return;
+				// }
+				if (painter.Painter.inputProperties) {
+					observedProperties.push.apply(observedProperties, painter.Painter.inputProperties);
+				}
+				inst = getPainterInstance(painter);
 			}
-			let contextOptions = painter.Painter.contextOptions || {};
-			let inst = getPainterInstance(painter);
-			
-			let equivalentDpr = contextOptions.scaling===false ? 1 : dpr;
 
 			if (contextOptions.nativePixels===true) {
 				geom.width *= dpr;
@@ -427,14 +448,17 @@ function updateElement(element, computedStyle) {
 				// 	ctx = ctx.canvas.getContext('2d');
 				// }
 			}
-			ctx.save();
-			ctx.beginPath();
-			inst.paint(ctx, geom, propertiesContainer);
-			// Close any open path so clearRect() can dump everything
-			ctx.closePath();
-			// ctx.stroke();  // useful to verify that the polyfill painted rather than native paint().
-			ctx.restore();
-			if ('resetTransform' in ctx) ctx.resetTransform();
+
+			if (inst) {
+				ctx.save();
+				ctx.beginPath();
+				inst.paint(ctx, geom, propertiesContainer);
+				// Close any open path so clearRect() can dump everything
+				ctx.closePath();
+				// ctx.stroke();  // useful to verify that the polyfill painted rather than native paint().
+				ctx.restore();
+				if ('resetTransform' in ctx) ctx.resetTransform();
+			}
 
 			newValue += token[1];
 
@@ -539,7 +563,7 @@ class PaintWorklet {
 					}
 				}
 				if (record.target.nodeType === 1) {
-					queueUpdate(record.target);
+					walk(record.target, queueUpdate);
 				}
 			}
 			lock = false;
