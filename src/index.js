@@ -120,7 +120,7 @@ function walk(node, iterator) {
 	iterator(node);
 	let child = node.firstElementChild;
 	while (child) {
-		iterator(child);
+		walk(child, iterator);
 		child = child.nextElementSibling;
 	}
 }
