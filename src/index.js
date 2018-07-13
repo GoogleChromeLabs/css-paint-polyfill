@@ -457,7 +457,10 @@ function updateElement(element, computedStyle) {
 				ctx.closePath();
 				// ctx.stroke();  // useful to verify that the polyfill painted rather than native paint().
 				ctx.restore();
-				if ('resetTransform' in ctx) ctx.resetTransform();
+				// -webkit-canvas() is scaled based on DPI by default, we don't want to reset that.
+				if (USE_CSS_CANVAS_CONTEXT===false && 'resetTransform' in ctx) {
+					ctx.resetTransform();
+			}
 			}
 
 			newValue += token[1];
@@ -499,10 +502,15 @@ function updateElement(element, computedStyle) {
 		newValue += value.substring(index);
 		if (hasChanged) {
 			if (!paintRule) paintRule = getPaintRuleForElement(element);
+
 			if (paintedProperties==null) {
 				paintedProperties = element.$$paintedProperties = {};
 			}
 			paintedProperties[property] = true;
+
+			if (property.substring(0, 10) === 'background' && dpr !== 1) {
+				applyStyleRule(paintRule.style, 'background-size', `${geom.width}px ${geom.height}px`);
+			}
 
 			if (urls.length===0) {
 				applyStyleRule(paintRule.style, property, newValue);
