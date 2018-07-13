@@ -34,6 +34,7 @@ document.documentElement.appendChild(root);
 
 let overridesStylesheet = document.createElement('style');
 overridesStylesheet.id = GLOBAL_ID;
+overridesStylesheet.$$isPaint = true;
 root.appendChild(overridesStylesheet);
 let overrideStyles = overridesStylesheet.sheet;
 let testStyles = root.style;
@@ -136,6 +137,7 @@ function update() {
 
 	for (let i=0; i<sheets.length; i++) {
 		let node = sheets[i].ownerNode;
+		if (node.$$isPaint) continue;
 		context.sheetId = node.$$paintid;
 		context.isNew = context.sheetId == null;
 		if (context.isNew) {
@@ -213,6 +215,8 @@ function replaceRule(rule, newRule) {
 
 // Replace paint(id) with url(data:image/paint-id) for a newly detected stylesheet
 function processNewSheet(node) {
+	if (node.$$isPaint) return;
+
 	if (node.href) {
 		fetchText(node.href, processRemoteSheet);
 		return false;
