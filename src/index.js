@@ -328,7 +328,7 @@ function maybeUpdateElement(element) {
 	if (element.$$paintObservedProperties) {
 		for (let i=0; i<element.$$paintObservedProperties.length; i++) {
 			let prop = element.$$paintObservedProperties[i];
-			if (computed.getPropertyValue(prop)!==element.$$paintedPropertyValues[prop]) {
+			if (computed.getPropertyValue(prop).trim() !== element.$$paintedPropertyValues[prop].trim()) {
 				updateElement(element, computed);
 				break;
 			}
