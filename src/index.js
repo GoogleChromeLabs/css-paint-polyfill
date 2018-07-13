@@ -460,7 +460,7 @@ function updateElement(element, computedStyle) {
 				// -webkit-canvas() is scaled based on DPI by default, we don't want to reset that.
 				if (USE_CSS_CANVAS_CONTEXT===false && 'resetTransform' in ctx) {
 					ctx.resetTransform();
-			}
+				}
 			}
 
 			newValue += token[1];
@@ -556,22 +556,28 @@ class PaintWorklet {
 		let a = document.createElement('x-a');
 		document.body.appendChild(a);
 
+		let supportsStyleMutations = false;
+
 		let lock = false;
 		new MutationObserver(records => {
 			if (lock===true) return;
 			lock = true;
 			for (let i = 0; i < records.length; i++) {
-				let record = records[i];
-				if (record.addedNodes) {
-					let nodes = record.addedNodes;
-					for (let j = 0; j < nodes.length; j++) {
-						if (nodes[j].nodeType === 1) {
-							queueUpdate(nodes[j]);
+				let record = records[i], added;
+				if (record.type === 'childList' && (added = record.addedNodes)) {
+					for (let j = 0; j < added.length; j++) {
+						if (added[j].nodeType === 1) {
+							queueUpdate(added[j]);
 						}
 					}
 				}
-				if (record.target.nodeType === 1) {
-					walk(record.target, queueUpdate);
+				else if (record.type==='attributes' && record.target.nodeType === 1) {
+					if (record.target === a) {
+						supportsStyleMutations = true;
+					}
+					else {
+						walk(record.target, queueUpdate);
+					}
 				}
 			}
 			lock = false;
@@ -583,9 +589,17 @@ class PaintWorklet {
 
 		a.style.cssText = 'color: red;';
 		setTimeout( () => {
-			supportsStyleMutations = '$$paintPending' in a;
 			document.body.removeChild(a);
 			if (!supportsStyleMutations) {
+				let styleDesc = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'style');
+				const oldStyleGetter = styleDesc.get;
+				styleDesc.get = function() {
+					const style = oldStyleGetter.call(this);
+					style.ownerElement = this;
+					return style;
+				};
+				defineProperty(HTMLElement.prototype, 'style', styleDesc);
+
 				let cssTextDesc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'cssText');
 				let oldSet = cssTextDesc.set;
 				cssTextDesc.set = function (value) {
@@ -593,6 +607,14 @@ class PaintWorklet {
 					return oldSet.call(this, value);
 				};
 				defineProperty(CSSStyleDeclaration.prototype, 'cssText', cssTextDesc);
+
+				let setPropertyDesc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'setProperty');
+				let oldSetProperty = setPropertyDesc.value;
+				setPropertyDesc.value = function (name, value, priority) {
+					if (this.ownerElement) queueUpdate(this.ownerElement);
+					oldSetProperty.call(this, name, value, priority);
+				};
+				defineProperty(CSSStyleDeclaration.prototype, 'setProperty', setPropertyDesc);
 			}
 		});
 	}
