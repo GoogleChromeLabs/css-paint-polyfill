@@ -367,8 +367,8 @@ function updateElement(element, computedStyle) {
 
 	// @TODO get computed styles and precompute geometry in a rAF after first paint, then re-use w/ invalidation
 	let geom = {
-		width: parseFloat(propertiesContainer.get('width')),
-		height: parseFloat(propertiesContainer.get('height'))
+		width: element.clientWidth,
+		height: element.clientHeight
 	};
 
 	let dpr = getDevicePixelRatio();
@@ -377,7 +377,6 @@ function updateElement(element, computedStyle) {
 
 	for (let i=0; i<style.length; i++) {
 		let property = style[i],
-			// value = style.getPropertyValue(property),
 			value = propertiesContainer.get(property),
 			reg = /(,|\b|^)url\((['"]?)((?:-moz-element\(#|-webkit-canvas\()paint-\d+-([^;,]+)\)|(?:data:image\/paint-|blob:[^'"#]+#paint=)([^"';, ]+)[;,].*?)\2\)(,|\b|$)/g,
 			newValue = '',
