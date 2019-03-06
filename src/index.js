@@ -249,7 +249,7 @@ function accumulateNonPaintRules(rule, nonPaintRules) {
 }
 
 function escapePaintRules(css) {
-	return css.replace(/(;|,|\b)paint\s*\(\s*(['"]?)(.+?)\2\s*\)(;|,|!|\b)/, '$1url(data:image/paint-$3,=)$4');
+	return css.replace(/(;|,|\b)paint\s*\(\s*(['"]?)(.+?)\2\s*\)(;|,|!|\b)/g, '$1url(data:image/paint-$3,=)$4');
 }
 
 let updateQueue = [];
