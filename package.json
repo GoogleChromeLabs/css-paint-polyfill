@@ -38,7 +38,7 @@
     "eslint-config-developit": "^1.1.1",
     "gh-pages": "^1.1.0",
     "microbundle": "^0.5.1",
-    "serve": "^6.4.9"
+    "serve": "^11.3.0"
   },
   "dependencies": {
     "transpiler-lite": "git+https://gist.github.com/781ef9620da8a30228b9f0c6e21fa7f6.git"
