@@ -139,6 +139,14 @@ function update() {
 	for (let i=0; i<sheets.length; i++) {
 		let node = sheets[i].ownerNode;
 		if (node.$$isPaint) continue;
+
+		// Check that we can access the sheet.
+		// The rules binding is required in order to prevent Terser from removing the block.
+		// eslint-disable-next-line no-unused-vars
+		let rules;
+		try { rules = node.sheet.cssRules; }
+		catch (e) { continue; }
+
 		context.sheetId = node.$$paintid;
 		context.isNew = context.sheetId == null;
 		if (context.isNew) {
