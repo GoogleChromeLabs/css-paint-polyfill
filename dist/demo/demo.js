@@ -24,7 +24,10 @@ catch(e) {
 	CSS.paintWorklet.transpile = window.transpilerLite;
 }
 
-CSS.paintWorklet.addModule('./ripple-worklet.js');
+var p = CSS.paintWorklet.addModule('./ripple-worklet.js');
+if (p) {
+	p.then(() => console.info('./ripple-worlet.js registered'));
+}
 
 if (!window.performance) window.performance = { now: Date.now.bind(Date) };
 
