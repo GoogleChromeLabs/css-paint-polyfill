@@ -8,6 +8,7 @@
     "build": "microbundle -f iife && cp -r demo dist/",
     "start": "concurrently serve \"microbundle watch -f iife\"",
     "test": "eslint src",
+    "release": "npm run -s build && npm t && git commit -am $npm_package_version && git tag $npm_package_version && git push && git push --tags && npm publish",
     "deploy": "cp -rf demo build && cp -r dist build/ && sed -i '' 's/\\.\\.\\/dist/dist/' build/index.html && gh-pages -d build && rm -rf build"
   },
   "eslintConfig": {
