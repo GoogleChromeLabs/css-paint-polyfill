@@ -43,11 +43,12 @@ const EMPTY_ARRAY = [];
 const HAS_PAINT = /(paint\(|-moz-element\(#paint-|-webkit-canvas\(paint-|[('"]blob:[^'"#]+#paint=|[('"]data:image\/paint-)/;
 const USE_CSS_CANVAS_CONTEXT = 'getCSSCanvasContext' in document;
 const USE_CSS_ELEMENT = (testStyles.backgroundImage = `-moz-element(#${GLOBAL_ID})`) === testStyles.backgroundImage;
+const HAS_PROMISE = (typeof Promise === 'function');
 testStyles.cssText = '';
 
 let supportsStyleMutations = true;
 let raf = window.requestAnimationFrame || setTimeout;
-let defer = typeof Promise === 'function' ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout;
+let defer = HAS_PROMISE ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout;
 let getDevicePixelRatio = () => window.devicePixelRatio || 1;
 
 let painters = {};
@@ -253,7 +254,7 @@ function accumulateNonPaintRules(rule, nonPaintRules) {
 }
 
 function escapePaintRules(css) {
-	return css.replace(/(;|,|\b)paint\s*\(\s*(['"]?)(.+?)\2\s*\)(;|,|!|\b)/, '$1url(data:image/paint-$3,=)$4');
+	return css.replace(/(;|,|\b)paint\s*\(\s*(['"]?)(.+?)\2\s*\)(;|,|!|\b)/g, '$1url(data:image/paint-$3,=)$4');
 }
 
 let updateQueue = [];
@@ -623,6 +624,11 @@ class PaintWorklet {
 	}
 
 	addModule(url) {
+		let p, resolve;
+		if (HAS_PROMISE) {
+			p = new Promise((r) => resolve = r);
+		}
+
 		fetchText(url, code => {
 			let context = {
 				registerPaint(name, Painter) {
@@ -641,6 +647,9 @@ class PaintWorklet {
 			code = (this.transpile || String)(code);
 
 			realm.exec(code);
+			if (resolve) resolve();
 		});
+
+		return p;
 	}
 }
