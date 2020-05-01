@@ -378,7 +378,7 @@ function updateElement(element, computedStyle) {
 	element.$$paintPending = false;
 
 	// @TODO get computed styles and precompute geometry in a rAF after first paint, then re-use w/ invalidation
-	let geom = {
+	let elementGeometry = {
 		width: element.clientWidth,
 		height: element.clientHeight
 	};
@@ -390,14 +390,37 @@ function updateElement(element, computedStyle) {
 	for (let i=0; i<style.length; i++) {
 		let property = style[i],
 			value = propertiesContainer.get(property),
-			reg = /(,|\b|^)url\((['"]?)((?:-moz-element\(#|-webkit-canvas\()paint-\d+-([^;,]+)\)|(?:data:image\/paint-|blob:[^'"#]+#paint=)([^"';, ]+)[;,].*?)\2\)(,|\b|$)/g,
+			reg = /(,|\b|^)url\((['"]?)((?:-moz-element\(#|-webkit-canvas\()paint-\d+-([^;,]+)\)|(?:data:image\/paint-|blob:[^'"#]+#paint=)([^"';, ]+)(?:[;,].*?)?)\2\)(;|,|\s|\b|$)/g,
 			newValue = '',
 			index = 0,
 			urls = [],
 			hasChanged = false,
 			hasPaints = false,
 			paintId,
-			token;
+			token,
+			geom = elementGeometry;
+		
+		// Support CSS Border Images
+		if (/border-image/.test(property)) {
+			let w = geom.width;
+			let h = geom.height;
+
+			const slice = parseCssDimensions(
+				propertiesContainer
+					.get('border-image-slice')
+					.replace(/\sfill/, '')
+					.split(' ')
+			);
+			w -= applyDimensions(w, slice.left) + applyDimensions(w, slice.right);
+			h -= applyDimensions(h, slice.top) + applyDimensions(h, slice.bottom);
+
+			const outset = parseCssDimensions(propertiesContainer.get('border-image-outset').split(' '));
+			w = applyDimensions(applyDimensions(w, outset.left), outset.right);
+			h = applyDimensions(applyDimensions(h, outset.top), outset.bottom);
+
+			geom = { width: w, height: h };
+		}
+
 		while ((token = reg.exec(value))) {
 			if (hasPaints === false) {
 				paintId = ensurePaintId(element);
@@ -562,6 +585,25 @@ function patchCssText(element) {
 	if (supportsStyleMutations===true) return;
 	if (element.style.ownerElement===element) return;
 	defineProperty(element.style, 'ownerElement', { value: element });
+}
+
+// apply a dimension offset to a base unit value (used for computing border-image sizes)
+function applyDimensions(base, dim) {
+	let v = parseFloat(dim);
+	if (!dim) return base;
+	if (dim.match('px')) return base + v;
+	if (dim.match('%')) v /= 100;
+	return base * v;
+}
+
+// Compute dimensions from a CSS unit group
+function parseCssDimensions(arr) {
+	return {
+		top: arr[0],
+		bottom: arr[2] || arr[0],
+		left: arr[3] || arr[1] || arr[0],
+		right: arr[1] || arr[0]
+	};
 }
 
 class PaintWorklet {
