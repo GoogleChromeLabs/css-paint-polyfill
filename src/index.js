@@ -281,8 +281,11 @@ function processUpdateQueue() {
 }
 
 function processItem(selector) {
-	let sel = document.querySelectorAll(selector);
-	for (let i=0; i<sel.length; i++) queueUpdate(sel[i]);
+	try {
+		let sel = document.querySelectorAll(selector);
+		for (let i=0; i<sel.length; i++) queueUpdate(sel[i]);
+	}
+	catch (e) {}
 }
 
 function loadImages(images, callback, args) {
