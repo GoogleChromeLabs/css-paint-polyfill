@@ -470,12 +470,6 @@ function updateElement(element, computedStyle) {
 
 			let inst;
 			if (painter) {
-				// if (!painter) {
-				// 	element.$$paintPending = true;
-				// 	overridesStylesheet.disabled = false;
-				// 	// setTimeout(maybeUpdateElement, 10, element);
-				// 	return;
-				// }
 				if (painter.Painter.inputProperties) {
 					observedProperties.push.apply(observedProperties, painter.Painter.inputProperties);
 				}
@@ -490,7 +484,7 @@ function updateElement(element, computedStyle) {
 
 			let actualWidth = equivalentDpr * geom.width,
 				actualHeight = equivalentDpr * geom.height;
-			
+
 			let ctx = element.$$paintContext,
 				cssContextId = `paint-${paintId}-${painterName}`;
 			if (!ctx || !ctx.canvas || ctx.canvas.width!=actualWidth || ctx.canvas.height!=actualHeight) {
@@ -498,11 +492,16 @@ function updateElement(element, computedStyle) {
 					ctx = document.getCSSCanvasContext('2d', cssContextId, actualWidth, actualHeight);
 				}
 				else {
-					let canvas = document.createElement('canvas');
-					canvas.id = cssContextId;
+					let canvas = ctx && ctx.canvas;
+					let shouldAppend = false;
+					if (!canvas) {
+						canvas = document.createElement('canvas');
+						canvas.id = cssContextId;
+						shouldAppend = USE_CSS_ELEMENT;
+					}
 					canvas.width = actualWidth;
 					canvas.height = actualHeight;
-					if (USE_CSS_ELEMENT===true) {
+					if (shouldAppend) {
 						canvas.style.display = 'none';
 						root.appendChild(canvas);
 					}
