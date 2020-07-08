@@ -118,6 +118,7 @@ function paintRuleWalker(rule, context) {
 }
 
 function walk(node, iterator) {
+	if ('ownerSVGElement' in node) return;
 	iterator(node);
 	let child = node.firstElementChild;
 	while (child) {
@@ -621,6 +622,10 @@ class PaintWorklet {
 			lock = true;
 			for (let i = 0; i < records.length; i++) {
 				let record = records[i], added;
+				// Ignore all inline SVG mutations:
+				if (record.target && 'ownerSVGElement' in record.target) {
+					continue;
+				}
 				if (record.type === 'childList' && (added = record.addedNodes)) {
 					for (let j = 0; j < added.length; j++) {
 						if (added[j].nodeType === 1) {
