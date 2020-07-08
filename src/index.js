@@ -253,8 +253,7 @@ function processRemoteSheet(css) {
 	const parent = styleIsolationFrame.contentWindow.document.body;
 
 	let style = document.createElement('style');
-	style.setAttribute('disabled', 'disabled');
-	style.media = 'worklet';
+	style.media = 'print';
 	style.$$paintid = ++styleSheetCounter;
 	style.appendChild(document.createTextNode(escapePaintRules(css)));
 	parent.appendChild(style);
