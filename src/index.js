@@ -59,6 +59,10 @@ let painters = {};
 let trackedRules = {};
 let styleSheetCounter = 0;
 
+addEventListener('resize', () => {
+	processItem('[data-css-paint]', true);
+});
+
 function registerPaint(name, Painter, worklet) {
 	// if (painters[name]!=null) throw Error(`registerPaint(${name}): name already registered`);
 	painters[name] = {
@@ -293,7 +297,10 @@ function escapePaintRules(css) {
 }
 
 let updateQueue = [];
-function queueUpdate(element) {
+function queueUpdate(element, forceInvalidate) {
+	if (forceInvalidate) {
+		element.$$paintObservedProperties = null;
+	}
 	if (element.$$paintPending===true) return;
 	element.$$paintPending = true;
 	if (updateQueue.indexOf(element) === -1 && updateQueue.push(element) === 1) {
@@ -307,10 +314,10 @@ function processUpdateQueue() {
 	}
 }
 
-function processItem(selector) {
+function processItem(selector, forceInvalidate) {
 	try {
 		let sel = document.querySelectorAll(selector);
-		for (let i=0; i<sel.length; i++) queueUpdate(sel[i]);
+		for (let i=0; i<sel.length; i++) queueUpdate(sel[i], forceInvalidate);
 	}
 	catch (e) {}
 }
