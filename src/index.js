@@ -32,6 +32,10 @@ let root = document.createElement(GLOBAL_ID);
 root.style.cssText = 'display: none;';
 document.documentElement.appendChild(root);
 
+let styleIsolationFrame = document.createElement('iframe');
+styleIsolationFrame.style.cssText = 'position:absolute; left:0; top:-999px; width:1px; height:1px;';
+root.appendChild(styleIsolationFrame);
+
 let overridesStylesheet = document.createElement('style');
 overridesStylesheet.id = GLOBAL_ID;
 overridesStylesheet.$$isPaint = true;
@@ -242,24 +246,46 @@ function processNewSheet(node) {
 }
 
 function processRemoteSheet(css) {
+	const parent = styleIsolationFrame.contentWindow.document.body;
+
 	let style = document.createElement('style');
-	style.disabled = true;
+	style.setAttribute('disabled', 'disabled');
+	style.media = 'worklet';
 	style.$$paintid = ++styleSheetCounter;
 	style.appendChild(document.createTextNode(escapePaintRules(css)));
-	(document.head || document.createElement('head')).appendChild(style);
-	let sheet = style.sheet,
-		toDelete = [],
-		rule;
-	walkStyles(sheet, accumulateNonPaintRules, toDelete);
-	while ( (rule = toDelete.pop()) ) replaceRule(rule, null);
-	update();
-	style.disabled = false;
-}
+	parent.appendChild(style);
 
-function accumulateNonPaintRules(rule, nonPaintRules) {
-	if (!HAS_PAINT.test(rule.cssText)) {
-		nonPaintRules.push(rule);
+	let newSheet = '';
+	walkStyles(style.sheet, (rule) => {
+		if (rule.type !== 1) return;
+		let css = '';
+		for (let i=0; i<rule.style.length; i++) {
+			const prop = rule.style.item(i);
+			const value = rule.style.getPropertyValue(prop);
+			if (HAS_PAINT.test(value)) {
+				css = `${prop}: ${value}${rule.style.getPropertyPriority(prop)};`;
+			}
+		}
+		if (!css) return;
+		css = `${rule.selectorText}{${css}}`;
+		// wrap the StyleRule in any parent ConditionalRules (media queries, etc):
+		let r = rule;
+		while ((r = r.parentRule)) {
+			css = `${r.cssText.match(/^[\s\S]+?\{/)[0]}${css}}`;
+		}
+		newSheet += css;
+	});
+
+	parent.removeChild(style);
+
+	if (newSheet) {
+		const pageStyles = document.createElement('style');
+		pageStyles.$$paintid = styleSheetCounter;
+		pageStyles.appendChild(document.createTextNode(newSheet));
+		root.appendChild(pageStyles);
 	}
+
+	update();
 }
 
 function escapePaintRules(css) {
