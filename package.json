@@ -1,6 +1,6 @@
 {
   "name": "css-paint-polyfill",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "A polyfill for the CSS Paint API, with special browser optimizations.",
   "source": "src/index.js",
   "main": "dist/css-paint-polyfill.js",
