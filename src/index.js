@@ -196,6 +196,15 @@ function walkStyles(sheet, iterator, context) {
 			}
 			current[0] = j;
 			let rule = rules[j];
+			// process @import rules (requires re-fetching)
+			if (rule.type === 3) {
+				if (rule.$$isPaint) continue;
+				const mq = rule.media && rule.media.mediaText;
+				if (mq && !self.matchMedia(mq).matches) continue;
+				rule.$$isPaint = true;
+				fetchText(rule.href, processRemoteSheet);
+				continue;
+			}
 			if (rule.type !== 1) {
 				if (rule.cssRules && rule.cssRules.length>0) {
 					stack.push([0, rule.cssRules]);
