@@ -94,6 +94,9 @@ root.appendChild(overridesStylesheet);
 let overrideStyles = overridesStylesheet.sheet;
 let testStyles = root.style;
 
+// when `true`, interception of styles is disabled
+let bypassStyleHooks = false;
+
 const EMPTY_ARRAY = [];
 const HAS_PAINT = /(paint\(|-moz-element\(#paint-|-webkit-canvas\(paint-|[('"]blob:[^'"#]+#paint=|[('"]data:image\/paint-)/;
 const USE_CSS_CANVAS_CONTEXT = 'getCSSCanvasContext' in document;
@@ -101,9 +104,7 @@ const USE_CSS_ELEMENT = (testStyles.backgroundImage = `-moz-element(#${GLOBAL_ID
 const HAS_PROMISE = (typeof Promise === 'function');
 testStyles.cssText = '';
 
-let supportsStyleMutations = true;
-let raf = window.requestAnimationFrame || setTimeout;
-let defer = HAS_PROMISE ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout;
+let defer = setTimeout;
 let getDevicePixelRatio = () => window.devicePixelRatio || 1;
 
 let painters = {};
@@ -111,7 +112,9 @@ let trackedRules = {};
 let styleSheetCounter = 0;
 
 addEventListener('resize', () => {
+	if (!resizeObserver) {
 	processItem('[data-css-paint]', true);
+	}
 });
 
 function registerPaint(name, Painter, worklet) {
@@ -123,7 +126,14 @@ function registerPaint(name, Painter, worklet) {
 		bit: 0,
 		instances: []
 	};
-	update();
+	let query = '';
+	for (let i=overrideStyles.cssRules.length; i--; ) {
+		const rule = overrideStyles.cssRules[i];
+		if (rule.style.cssText.indexOf('-' + name) !== -1) {
+			query += rule.selectorText;
+}
+	}
+	if (query) processItem(query, true);
 }
 
 function getPainter(name) {
@@ -194,7 +204,8 @@ function update() {
 			counters: {},
 			isNew: false,
 			sheetId: null
-		};
+		},
+		invalidateAll;
 
 	for (let i=0; i<sheets.length; i++) {
 		let node = sheets[i].ownerNode;
@@ -215,6 +226,7 @@ function update() {
 			if (processNewSheet(node)===false) {
 				continue;
 			}
+			invalidateAll = true;
 		}
 		walkStyles(node.sheet, paintRuleWalker, context);
 	}
@@ -227,6 +239,11 @@ function update() {
 	if (context.toProcess.length>0) {
 		processItem(context.toProcess.join(', '));
 	}
+
+	// If a new stylesheet is injected, invalidate all geometry and paint output.
+	if (invalidateAll) {
+		processItem('[data-css-paint]', true);
+}
 }
 
 function walkStyles(sheet, iterator, context) {
@@ -670,11 +687,13 @@ function dataUrlToBlob(dataUrl, name) {
 }
 
 function applyStyleRule(style, property, value) {
+	let o = bypassStyleHooks;
+	bypassStyleHooks = true;
 	style.setProperty(property, value, 'important');
+	bypassStyleHooks = o;
 }
 
 function patchCssText(element) {
-	if (supportsStyleMutations===true) return;
 	if (element.style.ownerElement===element) return;
 	defineProperty(element.style, 'ownerElement', { value: element });
 }
