@@ -442,7 +442,6 @@ function ensurePaintId(element) {
 	let paintId = element.$$paintId;
 	if (paintId==null) {
 		paintId = element.$$paintId = ++idCounter;
-		patchCssText(element);
 	}
 	return paintId;
 }
@@ -477,7 +476,7 @@ function getCssText(style) {
 
 function maybeUpdateElement(element) {
 	let computed = getComputedStyle(element);
-	if (element.$$paintObservedProperties) {
+	if (element.$$paintObservedProperties && !element.$$needsOverrides) {
 		for (let i=0; i<element.$$paintObservedProperties.length; i++) {
 			let prop = element.$$paintObservedProperties[i];
 			if (computed.getPropertyValue(prop).trim() !== element.$$paintedPropertyValues[prop].trim()) {
@@ -546,7 +545,6 @@ const resizeObserver = window.ResizeObserver && new window.ResizeObserver((entri
 			geom.width = ((entry.contentRect.right + entry.contentRect.left) || entry.contentRect.width) | 0;
 			geom.height = ((entry.contentRect.bottom + entry.contentRect.top) || entry.contentRect.height) | 0;
 		}
-		// Instead of enqueing an update, we do it synchronously.
 		queueUpdate(entry.target, true);
 	}
 });
@@ -643,18 +641,25 @@ function updateElement(element, computedStyle) {
 			let actualWidth = equivalentDpr * geom.width,
 				actualHeight = equivalentDpr * geom.height;
 
-			let ctx = element.$$paintContext,
-				cssContextId = `paint-${paintId}-${painterName}`;
-			if (!ctx || !ctx.canvas || ctx.canvas.width!=actualWidth || ctx.canvas.height!=actualHeight) {
+			let ctx = element.$$paintContext;
+			let cssContextId = `paint-${paintId}-${painterName}`;
+			let canvas = ctx && ctx.canvas;
+
+			// Changing the -webkit-canvas() id requires getting a new context.
+			const requiresNewBackingContext = USE_CSS_CANVAS_CONTEXT===true && ctx && cssContextId !== ctx.id;
+
+			if (!canvas || canvas.width!=actualWidth || canvas.height!=actualHeight || requiresNewBackingContext) {
 				if (USE_CSS_CANVAS_CONTEXT===true) {
 					ctx = document.getCSSCanvasContext('2d', cssContextId, actualWidth, actualHeight);
-					// clear a re-used context
+					ctx.id = cssContextId;
+					// Note: even when we replace ctx here, we don't update `canvas`.
+					// This is to enable the id !== check that sets hasChanged=true later.
 					if (element.$$paintContext) {
+						// clear any re-used context
 						ctx.clearRect(0, 0, actualWidth, actualHeight);
 					}
 				}
 				else {
-					let canvas = ctx && ctx.canvas;
 					let shouldAppend = false;
 					if (!canvas) {
 						canvas = document.createElement('canvas');
@@ -691,7 +696,7 @@ function updateElement(element, computedStyle) {
 				// ctx.stroke();  // useful to verify that the polyfill painted rather than native paint().
 				ctx.restore();
 				// -webkit-canvas() is scaled based on DPI by default, we don't want to reset that.
-				if (USE_CSS_CANVAS_CONTEXT===false && 'resetTransform' in ctx) {
+				if (USE_CSS_CANVAS_CONTEXT===false && !USE_CSS_ELEMENT && 'resetTransform' in ctx) {
 					ctx.resetTransform();
 				}
 			}
@@ -700,14 +705,22 @@ function updateElement(element, computedStyle) {
 
 			if (USE_CSS_CANVAS_CONTEXT===true) {
 				newValue += `-webkit-canvas(${cssContextId})`;
-				hasChanged = token[4] == null;
+				// new or replaced context (note: `canvas` is any PRIOR canvas)
+				if (token[4] == null || canvas.id !== cssContextId) {
+					hasChanged = true;
+			}
 			}
 			else if (USE_CSS_ELEMENT===true) {
 				newValue += `-moz-element(#${cssContextId})`;
-				hasChanged = token[4] == null;
+				if (token[4] == null) hasChanged = true;
+				// `canvas` here is the current canvas.
+				if (canvas.id !== cssContextId) {
+					canvas.id = cssContextId;
+					hasChanged = true;
+			}
 			}
 			else {
-				let uri = ctx.canvas.toDataURL('image/png').replace('/png', '/paint-' + painterName);
+				let uri = canvas.toDataURL('image/png').replace('/png', '/paint-' + painterName);
 				if (typeof MSBlobBuilder==='function') {
 					uri = dataUrlToBlob(uri, painterName);
 				}
@@ -789,11 +802,6 @@ function applyStyleRule(style, property, value) {
 	bypassStyleHooks = true;
 	style.setProperty(property, value, 'important');
 	bypassStyleHooks = o;
-}
-
-function patchCssText(element) {
-	if (element.style.ownerElement===element) return;
-	defineProperty(element.style, 'ownerElement', { value: element });
 }
 
 // apply a dimension offset to a base unit value (used for computing border-image sizes)
@@ -906,10 +914,15 @@ function init() {
 	};
 	styleDesc.get = function() {
 		const style = oldStyleGetter.call(this);
-		style.ownerElement = this;
+		if (style.ownerElement !== this) {
+			defineProperty(style, 'ownerElement', { value: this });
+		}
 		return style;
 	};
 	defineProperty(HTMLElement.prototype, 'style', styleDesc);
+
+	/** @type {PropertyDescriptorMap} */
+	const propDescs = {};
 
 	let cssTextDesc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'cssText');
 	let oldSet = cssTextDesc.set;
@@ -925,11 +938,11 @@ function init() {
 		}
 		return oldSet.call(this, value);
 	};
-	defineProperty(CSSStyleDeclaration.prototype, 'cssText', cssTextDesc);
+	propDescs.cssText = cssTextDesc;
 
 	['background', 'backgroundImage', 'borderImage'].forEach((prop) => {
 		const n = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
-		defineProperty(CSSStyleDeclaration.prototype, prop, {
+		propDescs[prop] = {
 			configurable: true,
 			enumerable: true,
 			get() {
@@ -941,7 +954,7 @@ function init() {
 				this.setProperty(n, v[1], v[2]);
 				return this[prop];
 			}
-		});
+		};
 	});
 
 	let setPropertyDesc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'setProperty');
@@ -958,7 +971,12 @@ function init() {
 		}
 		oldSetProperty.call(this, name, value, priority);
 	};
-	defineProperty(CSSStyleDeclaration.prototype, 'setProperty', setPropertyDesc);
+	propDescs.setProperty = setPropertyDesc;
+
+	Object.defineProperties(CSSStyleDeclaration.prototype, propDescs);
+	if (window.CSS2Properties) {
+		Object.defineProperties(window.CSS2Properties.prototype, propDescs);
+	}
 
 	update();
 }
