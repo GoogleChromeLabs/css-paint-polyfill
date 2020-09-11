@@ -16,13 +16,62 @@ import { defineProperty, fetchText } from './util';
 
 let paintWorklet;
 
-// Use a getter here (if available) to avoid installing
-// our MutationObserver if the API is never used.
-if (!window.CSS) window.CSS = {};
+let CSS = window.CSS;
+if (!CSS) window.CSS = CSS = {};
 
-if (!('paintWorklet' in window.CSS)) {
-	defineProperty(window.CSS, 'paintWorklet', {
-		get: () => (paintWorklet || (paintWorklet = new PaintWorklet()))
+if (!CSS.supports) CSS.supports = function s(property, value) {
+	if (property == 'paint') return true;
+	if (value) {
+		const el = styleIsolationFrame.contentDocument.body;
+		el.style.cssText = property + ':' + value;
+		return el.style.cssText.length > 0;
+	}
+	let tokenizer = /(^|not|(or)|(and))\s*\(\s*(.+?)\s*:(.+?)\)\s*|(.)/gi,
+		comparison, v, t, n;
+	// [, not, or, and, key, value, unknown]
+	while ((t = tokenizer.exec(property))) {
+		if (t[6]) return false;
+		n = s(t[4], t[5]);
+		v = t[2] ? (v || n) : t[3] ? (v && n) : (comparison = !t[1], n);
+	}
+	return v == comparison;
+};
+
+if (!CSS.escape) CSS.escape = s => s.replace(/([^\w-])/g,'\\$1');
+
+/** @type {{ [name: string]: { name: string, syntax: string, inherits: boolean, initialValue: string }} } */
+const CSS_PROPERTIES = {};
+if (!CSS.registerProperty) CSS.registerProperty = function (def) {
+	CSS_PROPERTIES[def.name] = def;
+};
+
+// Minimal poorlyfill for CSS properties+values
+function CSSUnitValue(value, unit) {
+	const num = parseFloat(value);
+	this.value = isNaN(num) ? value : num;
+	this.unit = unit;
+}
+CSSUnitValue.prototype.toString = function() {
+	return this.value + (this.unit == 'number' ? '' : this.unit);
+};
+CSSUnitValue.prototype.valueOf = function() {
+	return this.value;
+};
+
+'Hz Q ch cm deg dpcm dpi ddpx em ex fr grad in kHz mm ms number pc percent pt px rad rem s turn vh vmax vmin vw'.split(' ').forEach(unit => {
+	if (!CSS[unit]) {
+		CSS[unit] = v => new CSSUnitValue(v, unit);
+	}
+});
+
+
+const supportsPaintWorklet = !!CSS.paintWorklet;
+if (!supportsPaintWorklet) {
+	paintWorklet = new PaintWorklet();
+	defineProperty(CSS, 'paintWorklet', {
+		enumerable: true,
+		configurable: true,
+		get: () => paintWorklet
 	});
 }
 
@@ -30,7 +79,9 @@ const GLOBAL_ID = 'css-paint-polyfill';
 
 let root = document.createElement(GLOBAL_ID);
 root.style.cssText = 'display: none;';
+if (!supportsPaintWorklet) {
 document.documentElement.appendChild(root);
+}
 
 let styleIsolationFrame = document.createElement('iframe');
 styleIsolationFrame.style.cssText = 'position:absolute; left:0; top:-999px; width:1px; height:1px;';
@@ -647,15 +698,38 @@ function parseCssDimensions(arr) {
 	};
 }
 
-class PaintWorklet {
-	constructor() {
-		raf(update);
+function PaintWorklet() {}
+PaintWorklet.prototype.addModule = function(url) {
+	let p, resolve;
+	if (HAS_PROMISE) {
+		p = new Promise((r) => resolve = r);
+	}
 
-		let a = document.createElement('x-a');
-		document.body.appendChild(a);
+	fetchText(url, code => {
+		let context = {
+			registerPaint(name, Painter) {
+				registerPaint(name, Painter, {
+					context,
+					realm
+				});
+			}
+		};
+		defineProperty(context, 'devicePixelRatio', {
+			get: getDevicePixelRatio
+		});
+		context.self = context;
+		let realm = new Realm(context, root);
 
-		let supportsStyleMutations = false;
+		code = (this.transpile || String)(code);
 
+		realm.exec(code);
+		if (resolve) resolve();
+	});
+
+	return p;
+};
+
+function init() {
 		let lock = false;
 		new MutationObserver(records => {
 			if (lock===true) return;
@@ -718,36 +792,11 @@ class PaintWorklet {
 				};
 				defineProperty(CSSStyleDeclaration.prototype, 'setProperty', setPropertyDesc);
 			}
-		});
-	}
 
-	addModule(url) {
-		let p, resolve;
-		if (HAS_PROMISE) {
-			p = new Promise((r) => resolve = r);
-		}
-
-		fetchText(url, code => {
-			let context = {
-				registerPaint(name, Painter) {
-					registerPaint(name, Painter, {
-						context,
-						realm
-					});
+if (!supportsPaintWorklet) {
+	try {
+		init();
 				}
-			};
-			defineProperty(context, 'devicePixelRatio', {
-				get: getDevicePixelRatio
-			});
-			context.self = context;
-			let realm = new Realm(context, root);
-
-			code = (this.transpile || String)(code);
-
-			realm.exec(code);
-			if (resolve) resolve();
-		});
-
-		return p;
+	catch (e) {
 	}
 }
