@@ -959,6 +959,8 @@ function init() {
 		oldSetProperty.call(this, name, value, priority);
 	};
 	defineProperty(CSSStyleDeclaration.prototype, 'setProperty', setPropertyDesc);
+
+	update();
 }
 
 if (!supportsPaintWorklet) {
