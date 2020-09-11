@@ -11,6 +11,8 @@ A polyfill that brings Houdini's [CSS Custom Paint API] and Paint Worklets to al
 
 Performance is particularly good in Firefox and Safari, where this polyfill leverages `-webkit-canvas()` and `-moz-element()` for optimized rendering. For other browsers, framerate is governed by Canvas `toDataURL()` / `toBlob()` speed.
 
+As of version 3, this polyfill also includes basic implementations of `CSS.supports()`, `CSS.registerProperty()` and CSS unit functions (`CSS.px()` etc), which are injected in browsers without native support.
+
 ## What are Paint Worklets?
 
 Paint Worklets are JavaScript modules in which you can program custom graphics code. Once registered, they can be applied to elements using CSS:
