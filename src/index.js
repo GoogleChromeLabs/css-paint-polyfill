@@ -80,7 +80,7 @@ const GLOBAL_ID = 'css-paint-polyfill';
 let root = document.createElement(GLOBAL_ID);
 root.style.cssText = 'display: none;';
 if (!supportsPaintWorklet) {
-document.documentElement.appendChild(root);
+	document.documentElement.appendChild(root);
 }
 
 let styleIsolationFrame = document.createElement('iframe');
@@ -113,7 +113,7 @@ let styleSheetCounter = 0;
 
 addEventListener('resize', () => {
 	if (!resizeObserver) {
-	processItem('[data-css-paint]', true);
+		processItem('[data-css-paint]', true);
 	}
 });
 
@@ -131,7 +131,7 @@ function registerPaint(name, Painter, worklet) {
 		const rule = overrideStyles.cssRules[i];
 		if (rule.style.cssText.indexOf('-' + name) !== -1) {
 			query += rule.selectorText;
-}
+		}
 	}
 	if (query) processItem(query, true);
 }
@@ -243,7 +243,7 @@ function update() {
 	// If a new stylesheet is injected, invalidate all geometry and paint output.
 	if (invalidateAll) {
 		processItem('[data-css-paint]', true);
-}
+	}
 }
 
 function walkStyles(sheet, iterator, context) {
@@ -269,6 +269,8 @@ function walkStyles(sheet, iterator, context) {
 				if (rule.$$isPaint) continue;
 				const mq = rule.media && rule.media.mediaText;
 				if (mq && !self.matchMedia(mq).matches) continue;
+				// don't refetch google font stylesheets
+				if (/ts\.g.{7}is\.com\/css/.test(rule.href)) continue;
 				rule.$$isPaint = true;
 				fetchText(rule.href, processRemoteSheet);
 				continue;
@@ -284,6 +286,17 @@ function walkStyles(sheet, iterator, context) {
 		}
 	}
 	return context;
+}
+
+function parseCss(css) {
+	let parent = styleIsolationFrame.contentDocument.body;
+	let style = document.createElement('style');
+	style.media = 'print';
+	style.$$paintid = ++styleSheetCounter;
+	style.appendChild(document.createTextNode(css));
+	parent.appendChild(style);
+	style.sheet.remove = () => parent.removeChild(style);
+	return style.sheet;
 }
 
 function replaceRule(rule, newRule) {
@@ -327,16 +340,10 @@ function processNewSheet(node) {
 }
 
 function processRemoteSheet(css) {
-	const parent = styleIsolationFrame.contentWindow.document.body;
-
-	let style = document.createElement('style');
-	style.media = 'print';
-	style.$$paintid = ++styleSheetCounter;
-	style.appendChild(document.createTextNode(escapePaintRules(css)));
-	parent.appendChild(style);
+	const sheet = parseCss(escapePaintRules(css));
 
 	let newSheet = '';
-	walkStyles(style.sheet, (rule) => {
+	walkStyles(sheet, (rule) => {
 		if (rule.type !== 1) return;
 		let css = '';
 		for (let i=0; i<rule.style.length; i++) {
@@ -356,26 +363,28 @@ function processRemoteSheet(css) {
 		newSheet += css;
 	});
 
-	parent.removeChild(style);
+	sheet.remove();
 
 	if (newSheet) {
 		const pageStyles = document.createElement('style');
-		pageStyles.$$paintid = styleSheetCounter;
+		// pageStyles.$$paintid = styleSheetCounter;
 		pageStyles.appendChild(document.createTextNode(newSheet));
 		root.appendChild(pageStyles);
+		update();
 	}
-
-	update();
 }
 
 function escapePaintRules(css) {
-	return css.replace(/(;|,|\b)paint\s*\(\s*(['"]?)(.+?)\2\s*\)(;|,|!|\b)/g, '$1url(data:image/paint-$3,=)$4');
+	return css.replace(/(;|,|\b)paint\s*\(\s*(['"]?)(.+?)\2\s*\)(;|,|!|\b|$)/g, '$1url(data:image/paint-$3,=)$4');
 }
 
 let updateQueue = [];
 function queueUpdate(element, forceInvalidate) {
 	if (forceInvalidate) {
 		element.$$paintObservedProperties = null;
+		if (element.$$paintGeometry && !element.$$paintGeometry.live) {
+			element.$$paintGeometry = null;
+		}
 	}
 	if (element.$$paintPending===true) return;
 	element.$$paintPending = true;
@@ -384,10 +393,27 @@ function queueUpdate(element, forceInvalidate) {
 	}
 }
 function processUpdateQueue() {
-	let el;
-	while ((el = updateQueue.pop())) {
-		maybeUpdateElement(el);
+	// any added stylesheets get processed first before flushing queued elements
+	let shouldUpdate;
+	for (let i=0; i<updateQueue.length; i++) {
+		if (updateQueue[i] && updateQueue[i].localName === 'style') {
+			shouldUpdate = true;
+			updateQueue[i] = null;
+		}
 	}
+	if (shouldUpdate) {
+		defer(processUpdateQueue);
+		update();
+		return;
+	}
+	// if we need to disable the override sheet, only do it once:
+	const disable = updateQueue.length && updateQueue.some(el => el && el.$$needsOverrides === true);
+	if (disable) disableOverrides();
+	while (updateQueue.length) {
+		let el = updateQueue.pop();
+		if (el) maybeUpdateElement(el);
+	}
+	if (disable) enableOverrides();
 }
 
 function processItem(selector, forceInvalidate) {
@@ -428,7 +454,7 @@ function getPaintRuleForElement(element) {
 		if (!element.hasAttribute('data-css-paint')) {
 			element.setAttribute('data-css-paint', paintId);
 		}
-		let index = overrideStyles.insertRule(`[data-css-paint="${idCounter}"] {}`, overrideStyles.cssRules.length);
+		let index = overrideStyles.insertRule(`[data-css-paint="${paintId}"] {}`, overrideStyles.cssRules.length);
 		paintRule = element.$$paintRule = overrideStyles.cssRules[index];
 	}
 	return paintRule;
@@ -468,18 +494,74 @@ function maybeUpdateElement(element) {
 	element.$$paintPending = false;
 }
 
-let currentProperties, propertyContainerCache;
+// Invalidate any cached geometry and enqueue an update
+function invalidateElementGeometry(element) {
+	if (element.$$paintGeometry && !element.$$paintGeometry.live) {
+		element.$$paintGeometry = null;
+	}
+	queueUpdate(element);
+}
+
+let currentProperties, currentElement, propertyContainerCache;
 const propertiesContainer = {
+	// .get() is used by worklets
 	get(name) {
+		const def = CSS_PROPERTIES[name];
+		let v = def && def.inherits === false ? currentElement.style.getPropertyValue(name) : propertiesContainer.getRaw(name);
+		if (v == null && def) v = def.initialValue;
+		else if (def && def.syntax) {
+			const s = def.syntax.replace(/[<>\s]/g, '');
+			if (typeof CSS[s] === 'function') v = CSS[s](v);
+		}
+		return v;
+	},
+	getRaw(name) {
 		if (name in propertyContainerCache) return propertyContainerCache[name];
 		return propertyContainerCache[name] = currentProperties.getPropertyValue(name);
 	}
 };
 
+// Get element geometry, relying on cached values if possible.
+function getElementGeometry(element) {
+	return element.$$paintGeometry || (element.$$paintGeometry = {
+		width: element.clientWidth,
+		height: element.clientHeight,
+		live: false
+	});
+}
+
+const resizeObserver = window.ResizeObserver && new window.ResizeObserver((entries) => {
+	for (let i=0; i<entries.length; i++) {
+		const entry = entries[i];
+		let geom = entry.target.$$paintGeometry;
+		if (!geom) {
+			geom = entry.target.$$paintGeometry = { width: 0, height: 0, live: true };
+		}
+		geom.live = true;
+		if (entry.borderBoxSize && entry.borderBoxSize.length) {
+			geom.width = entry.borderBoxSize[0].inlineSize | 0;
+			geom.height = entry.borderBoxSize[0].blockSize | 0;
+		}
+		else {
+			geom.width = ((entry.contentRect.right + entry.contentRect.left) || entry.contentRect.width) | 0;
+			geom.height = ((entry.contentRect.bottom + entry.contentRect.top) || entry.contentRect.height) | 0;
+		}
+		// Instead of enqueing an update, we do it synchronously.
+		queueUpdate(entry.target, true);
+	}
+});
+function observeResize(element) {
+	if (resizeObserver && !element.$$paintGeometry.live) {
+		element.$$paintGeometry.live = true;
+		resizeObserver.observe(element);
+	}
+}
+
 let idCounter = 0;
 function updateElement(element, computedStyle) {
-	overridesStylesheet.disabled = true;
+	if (element.$$needsOverrides === true) disableOverrides();
 	let style = currentProperties = computedStyle==null ? getComputedStyle(element) : computedStyle;
+	currentElement = element;
 	// element.$$paintGeom = style;
 	propertyContainerCache = {};
 	let paintRule;
@@ -488,10 +570,9 @@ function updateElement(element, computedStyle) {
 	element.$$paintPending = false;
 
 	// @TODO get computed styles and precompute geometry in a rAF after first paint, then re-use w/ invalidation
-	let elementGeometry = {
-		width: element.clientWidth,
-		height: element.clientHeight
-	};
+	let elementGeometry = getElementGeometry(element);
+	observeResize(element);
+	elementGeometry = { width: elementGeometry.width, height: elementGeometry.height };
 
 	let dpr = getDevicePixelRatio();
 
@@ -499,8 +580,9 @@ function updateElement(element, computedStyle) {
 
 	for (let i=0; i<style.length; i++) {
 		let property = style[i],
-			value = propertiesContainer.get(property),
-			reg = /(,|\b|^)url\((['"]?)((?:-moz-element\(#|-webkit-canvas\()paint-\d+-([^;,]+)\)|(?:data:image\/paint-|blob:[^'"#]+#paint=)([^"';, ]+)(?:[;,].*?)?)\2\)(;|,|\s|\b|$)/g,
+			value = propertiesContainer.getRaw(property),
+			// I am sorry
+			reg = /(,|\b|^)(?:url\((['"]?))?((?:-moz-element\(#|-webkit-canvas\()paint-\d+-([^;,]+)|(?:data:image\/paint-|blob:[^'"#]+#paint=)([^"';, ]+)(?:[;,].*?)?)\2\)(;|,|\s|\b|$)/g,
 			newValue = '',
 			index = 0,
 			urls = [],
@@ -509,7 +591,7 @@ function updateElement(element, computedStyle) {
 			paintId,
 			token,
 			geom = elementGeometry;
-		
+
 		// Support CSS Border Images
 		if (/border-image/.test(property)) {
 			let w = geom.width;
@@ -517,14 +599,14 @@ function updateElement(element, computedStyle) {
 
 			const slice = parseCssDimensions(
 				propertiesContainer
-					.get('border-image-slice')
+					.getRaw('border-image-slice')
 					.replace(/\sfill/, '')
 					.split(' ')
 			);
 			w -= applyDimensions(w, slice.left) + applyDimensions(w, slice.right);
 			h -= applyDimensions(h, slice.top) + applyDimensions(h, slice.bottom);
 
-			const outset = parseCssDimensions(propertiesContainer.get('border-image-outset').split(' '));
+			const outset = parseCssDimensions(propertiesContainer.getRaw('border-image-outset').split(' '));
 			w = applyDimensions(applyDimensions(w, outset.left), outset.right);
 			h = applyDimensions(applyDimensions(h, outset.top), outset.bottom);
 
@@ -566,6 +648,10 @@ function updateElement(element, computedStyle) {
 			if (!ctx || !ctx.canvas || ctx.canvas.width!=actualWidth || ctx.canvas.height!=actualHeight) {
 				if (USE_CSS_CANVAS_CONTEXT===true) {
 					ctx = document.getCSSCanvasContext('2d', cssContextId, actualWidth, actualHeight);
+					// clear a re-used context
+					if (element.$$paintContext) {
+						ctx.clearRect(0, 0, actualWidth, actualHeight);
+					}
 				}
 				else {
 					let canvas = ctx && ctx.canvas;
@@ -614,7 +700,7 @@ function updateElement(element, computedStyle) {
 
 			if (USE_CSS_CANVAS_CONTEXT===true) {
 				newValue += `-webkit-canvas(${cssContextId})`;
-				hasChanged = token[4]==null;
+				hasChanged = token[4] == null;
 			}
 			else if (USE_CSS_ELEMENT===true) {
 				newValue += `-moz-element(#${cssContextId})`;
@@ -643,6 +729,8 @@ function updateElement(element, computedStyle) {
 		if (hasPaints===false && paintedProperties!=null && paintedProperties[property]!=null) {
 			if (!paintRule) paintRule = getPaintRuleForElement(element);
 			paintRule.style.removeProperty(property);
+			if (resizeObserver) resizeObserver.unobserve(element);
+			if (element.$$paintGeometry) element.$$paintGeometry.live = false;
 			continue;
 		}
 
@@ -656,7 +744,8 @@ function updateElement(element, computedStyle) {
 			paintedProperties[property] = true;
 
 			if (property.substring(0, 10) === 'background' && dpr !== 1) {
-				applyStyleRule(paintRule.style, 'background-size', `${geom.width}px ${geom.height}px`);
+				// `${geom.width}px ${geom.height}px` `contain`
+				applyStyleRule(paintRule.style, 'background-size', `100% 100%`);
 			}
 
 			if (urls.length===0) {
@@ -673,10 +762,19 @@ function updateElement(element, computedStyle) {
 	for (let i=0; i<observedProperties.length; i++) {
 		let prop = observedProperties[i];
 		// use propertyContainer here to select cached values
-		propertyValues[prop] = propertiesContainer.get(prop);
+		propertyValues[prop] = propertiesContainer.getRaw(prop);
 	}
 
-	overridesStylesheet.disabled = false;
+	if (element.$$needsOverrides === true) enableOverrides();
+	element.$$needsOverrides = null;
+}
+
+let overrideLocks = 0;
+function disableOverrides() {
+	if (!overrideLocks++) overridesStylesheet.disabled = true;
+}
+function enableOverrides() {
+	if (!--overrideLocks) overridesStylesheet.disabled = false;
 }
 
 function dataUrlToBlob(dataUrl, name) {
@@ -749,73 +847,124 @@ PaintWorklet.prototype.addModule = function(url) {
 };
 
 function init() {
-		let lock = false;
-		new MutationObserver(records => {
-			if (lock===true) return;
-			lock = true;
-			for (let i = 0; i < records.length; i++) {
-				let record = records[i], added;
-				// Ignore all inline SVG mutations:
-				if (record.target && 'ownerSVGElement' in record.target) {
-					continue;
-				}
-				if (record.type === 'childList' && (added = record.addedNodes)) {
+	let lock = false;
+	new MutationObserver(records => {
+		if (lock===true || overrideLocks) return;
+		lock = true;
+		for (let i = 0; i < records.length; i++) {
+			let record = records[i], added, removed;
+			// Ignore all inline SVG mutations:
+			if (record.target && 'ownerSVGElement' in record.target) {
+				continue;
+			}
+			if (record.type === 'childList') {
+				if ((added = record.addedNodes)) {
 					for (let j = 0; j < added.length; j++) {
 						if (added[j].nodeType === 1) {
 							queueUpdate(added[j]);
 						}
 					}
 				}
-				else if (record.type==='attributes' && record.target.nodeType === 1) {
-					if (record.target === a) {
-						supportsStyleMutations = true;
-					}
-					else {
-						walk(record.target, queueUpdate);
+				if ((removed = record.removedNodes)) {
+					for (let j = 0; j < removed.length; j++) {
+						if (resizeObserver && removed[j].$$paintGeometry) {
+							removed[j].$$paintGeometry.live = false;
+							if (resizeObserver) resizeObserver.unobserve(removed[j]);
+						}
 					}
 				}
 			}
-			lock = false;
-		}).observe(document.body, {
-			childList: true,
-			attributes: true,
-			subtree: true
-		});
-
-		a.style.cssText = 'color: red;';
-		setTimeout( () => {
-			document.body.removeChild(a);
-			if (!supportsStyleMutations) {
-				let styleDesc = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'style');
-				const oldStyleGetter = styleDesc.get;
-				styleDesc.get = function() {
-					const style = oldStyleGetter.call(this);
-					style.ownerElement = this;
-					return style;
-				};
-				defineProperty(HTMLElement.prototype, 'style', styleDesc);
-
-				let cssTextDesc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'cssText');
-				let oldSet = cssTextDesc.set;
-				cssTextDesc.set = function (value) {
-					if (this.ownerElement) queueUpdate(this.ownerElement);
-					return oldSet.call(this, value);
-				};
-				defineProperty(CSSStyleDeclaration.prototype, 'cssText', cssTextDesc);
-
-				let setPropertyDesc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'setProperty');
-				let oldSetProperty = setPropertyDesc.value;
-				setPropertyDesc.value = function (name, value, priority) {
-					if (this.ownerElement) queueUpdate(this.ownerElement);
-					oldSetProperty.call(this, name, value, priority);
-				};
-				defineProperty(CSSStyleDeclaration.prototype, 'setProperty', setPropertyDesc);
+			else if (record.type==='attributes' && record.target.nodeType === 1) {
+				walk(record.target, invalidateElementGeometry);
 			}
+		}
+		lock = false;
+	}).observe(document.body, {
+		childList: true,
+		attributes: true,
+		subtree: true
+	});
+
+	const setAttributeDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'setAttribute');
+	const oldSetAttribute = setAttributeDesc.value;
+	setAttributeDesc.value = function(name, value) {
+		if (name === 'style' && HAS_PAINT.test(value)) {
+			value = escapePaintRules(value);
+			ensurePaintId(this);
+			this.$$needsOverrides = true;
+			invalidateElementGeometry(this);
+		}
+		return oldSetAttribute.call(this, name, value);
+	};
+	defineProperty(Element.prototype, 'setAttribute', setAttributeDesc);
+
+	let styleDesc = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'style');
+	const oldStyleGetter = styleDesc.get;
+	styleDesc.set = function(value) {
+		const style = styleDesc.get.call(this);
+		return style.cssText = value;
+	};
+	styleDesc.get = function() {
+		const style = oldStyleGetter.call(this);
+		style.ownerElement = this;
+		return style;
+	};
+	defineProperty(HTMLElement.prototype, 'style', styleDesc);
+
+	let cssTextDesc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'cssText');
+	let oldSet = cssTextDesc.set;
+	cssTextDesc.set = function (value) {
+		if (!overrideLocks && HAS_PAINT.test(value)) {
+			value = value && escapePaintRules(value);
+			const owner = this.ownerElement;
+			if (owner) {
+				ensurePaintId(owner);
+				owner.$$needsOverrides = true;
+				invalidateElementGeometry(owner);
+			}
+		}
+		return oldSet.call(this, value);
+	};
+	defineProperty(CSSStyleDeclaration.prototype, 'cssText', cssTextDesc);
+
+	['background', 'backgroundImage', 'borderImage'].forEach((prop) => {
+		const n = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+		defineProperty(CSSStyleDeclaration.prototype, prop, {
+			configurable: true,
+			enumerable: true,
+			get() {
+				let pri = this.getPropertyPriority(n);
+				return this.getPropertyValue(n) + (pri ? ' !'+pri : '');
+			},
+			set(value) {
+				const v = String(value).match(/^(.*?)\s*(?:!\s*(important)\s*)?$/);
+				this.setProperty(n, v[1], v[2]);
+				return this[prop];
+			}
+		});
+	});
+
+	let setPropertyDesc = Object.getOwnPropertyDescriptor(CSSStyleDeclaration.prototype, 'setProperty');
+	let oldSetProperty = setPropertyDesc.value;
+	setPropertyDesc.value = function (name, value, priority) {
+		if (!bypassStyleHooks && !overrideLocks && HAS_PAINT.test(value)) {
+			value = value && escapePaintRules(value);
+			const owner = this.ownerElement;
+			if (owner) {
+				ensurePaintId(owner);
+				owner.$$needsOverrides = true;
+				invalidateElementGeometry(owner);
+			}
+		}
+		oldSetProperty.call(this, name, value, priority);
+	};
+	defineProperty(CSSStyleDeclaration.prototype, 'setProperty', setPropertyDesc);
+}
 
 if (!supportsPaintWorklet) {
 	try {
 		init();
-				}
+	}
 	catch (e) {
 	}
 }
