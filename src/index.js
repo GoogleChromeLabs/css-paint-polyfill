@@ -450,7 +450,8 @@ function getPaintRuleForElement(element) {
 	let paintRule = element.$$paintRule,
 		paintId = ensurePaintId(element);
 	if (paintRule==null) {
-		if (!element.hasAttribute('data-css-paint')) {
+		// Fix cloned DOM trees which can have incorrect data-css-paint attributes:
+		if (Number(element.getAttribute('data-css-paint')) !== paintId) {
 			element.setAttribute('data-css-paint', paintId);
 		}
 		let index = overrideStyles.insertRule(`[data-css-paint="${paintId}"] {}`, overrideStyles.cssRules.length);
@@ -706,7 +707,7 @@ function updateElement(element, computedStyle) {
 			if (USE_CSS_CANVAS_CONTEXT===true) {
 				newValue += `-webkit-canvas(${cssContextId})`;
 				// new or replaced context (note: `canvas` is any PRIOR canvas)
-				if (token[4] == null || canvas.id !== cssContextId) {
+				if (token[4] == null || canvas && canvas.id !== cssContextId) {
 					hasChanged = true;
 			}
 			}
@@ -714,7 +715,7 @@ function updateElement(element, computedStyle) {
 				newValue += `-moz-element(#${cssContextId})`;
 				if (token[4] == null) hasChanged = true;
 				// `canvas` here is the current canvas.
-				if (canvas.id !== cssContextId) {
+				if (canvas && canvas.id !== cssContextId) {
 					canvas.id = cssContextId;
 					hasChanged = true;
 			}
