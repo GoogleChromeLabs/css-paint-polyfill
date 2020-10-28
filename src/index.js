@@ -151,12 +151,19 @@ function getPainterInstance(painter) {
 
 function paintRuleWalker(rule, context) {
 	let css = rule.cssText;
+	const hasPaint = HAS_PAINT.test(css);
 
-	if (context.isNew === true && HAS_PAINT.test(css)) {
+	if (context.isNew === true && hasPaint) {
 		if (css !== (css = escapePaintRules(css))) {
 			rule = replaceRule(rule, css);
 		}
 	}
+
+	// Hello future self!
+	// This eager exit avoids tracking unpainted rules.
+	// That seems reasonable, but it wasn't in place in 3.0...
+	// Perhaps I'm missing something, if so, I apologize.
+	if (!hasPaint) return;
 
 	let selector = rule.selectorText,
 		cssText = getCssText(rule.style),
