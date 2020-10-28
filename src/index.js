@@ -508,6 +508,8 @@ const propertiesContainer = {
 	get(name) {
 		const def = CSS_PROPERTIES[name];
 		let v = def && def.inherits === false ? currentElement.style.getPropertyValue(name) : propertiesContainer.getRaw(name);
+		// Safari returns whitespace around values:
+		if (typeof v === 'string') v = v.trim();
 		if (v == null && def) v = def.initialValue;
 		else if (def && def.syntax) {
 			const s = def.syntax.replace(/[<>\s]/g, '');
