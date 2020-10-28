@@ -869,7 +869,10 @@ function init() {
 				if ((added = record.addedNodes)) {
 					for (let j = 0; j < added.length; j++) {
 						if (added[j].nodeType === 1) {
-							queueUpdate(added[j]);
+							// Newly inserted elements can contain entire subtrees
+							// if constructed before the root is attached. Only the root
+							// emits a mutation, so we have to visit all children:
+							walk(added[j], queueUpdate);
 						}
 					}
 				}
