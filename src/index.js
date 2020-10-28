@@ -104,7 +104,7 @@ const USE_CSS_ELEMENT = (testStyles.backgroundImage = `-moz-element(#${GLOBAL_ID
 const HAS_PROMISE = (typeof Promise === 'function');
 testStyles.cssText = '';
 
-let defer = setTimeout;
+let defer = window.requestAnimationFrame || setTimeout;
 let getDevicePixelRatio = () => window.devicePixelRatio || 1;
 
 let painters = {};
