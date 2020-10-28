@@ -552,8 +552,12 @@ const resizeObserver = window.ResizeObserver && new window.ResizeObserver((entri
 			geom.height = entry.borderBoxSize[0].blockSize | 0;
 		}
 		else {
-			geom.width = ((entry.contentRect.right + entry.contentRect.left) || entry.contentRect.width) | 0;
-			geom.height = ((entry.contentRect.bottom + entry.contentRect.top) || entry.contentRect.height) | 0;
+			// contentRect is the content box, so we add padding to get border-box:
+			const computed = getComputedStyle(entry.target);
+			const paddingY = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
+			const paddingX = parseFloat(computed.paddingLeft) + parseFloat(computed.paddingRight);
+			geom.width = Math.round(((entry.contentRect.right + entry.contentRect.left) || entry.contentRect.width) + paddingX);
+			geom.height = Math.round(((entry.contentRect.bottom + entry.contentRect.top) || entry.contentRect.height) + paddingY);
 		}
 		queueUpdate(entry.target, true);
 	}
@@ -718,7 +722,7 @@ function updateElement(element, computedStyle) {
 				// new or replaced context (note: `canvas` is any PRIOR canvas)
 				if (token[4] == null || canvas && canvas.id !== cssContextId) {
 					hasChanged = true;
-			}
+				}
 			}
 			else if (USE_CSS_ELEMENT===true) {
 				newValue += `-moz-element(#${cssContextId})`;
@@ -727,7 +731,7 @@ function updateElement(element, computedStyle) {
 				if (canvas && canvas.id !== cssContextId) {
 					canvas.id = cssContextId;
 					hasChanged = true;
-			}
+				}
 			}
 			else {
 				let uri = canvas.toDataURL('image/png').replace('/png', '/paint-' + painterName);
