@@ -996,6 +996,34 @@ function init() {
 		});
 	}
 
+	const OPTS = { passive: true };
+
+	[
+		'animationiteration',
+		'animationend',
+		'animationstart',
+		'transitionstart',
+		'transitionend',
+		'transitionrun',
+		'transitioncancel',
+		'mouseover',
+		'mouseout',
+		'mousedown',
+		'mouseup',
+		'focus',
+		'blur'
+	].forEach(event => {
+		addEventListener(event, updateFromEvent, OPTS);
+	});
+
+	function updateFromEvent(e) {
+		let t = e.target;
+		while (t) {
+			if (t.nodeType === 1) queueUpdate(t);
+			t = t.parentNode;
+		}
+	}
+
 	update();
 }
 
