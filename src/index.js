@@ -111,12 +111,6 @@ let painters = {};
 let trackedRules = {};
 let styleSheetCounter = 0;
 
-addEventListener('resize', () => {
-	if (!resizeObserver) {
-		processItem('[data-css-paint]', true);
-	}
-});
-
 function registerPaint(name, Painter, worklet) {
 	// if (painters[name]!=null) throw Error(`registerPaint(${name}): name already registered`);
 	painters[name] = {
@@ -993,6 +987,12 @@ function init() {
 	Object.defineProperties(CSSStyleDeclaration.prototype, propDescs);
 	if (window.CSS2Properties) {
 		Object.defineProperties(window.CSS2Properties.prototype, propDescs);
+	}
+
+	if (!resizeObserver) {
+		addEventListener('resize', () => {
+			processItem('[data-css-paint]', true);
+		});
 	}
 
 	update();
