@@ -1102,8 +1102,8 @@ function init() {
 				do { if (t.nodeType === 1) p.push(t); } while ((t = t.parentNode));
 				let frame = () => {
 					if (!this.$$paintAnimating) return frame = null;
-					for (let i=p.length; i--; ) queueUpdate(p[i]);
 					this.$$paintRaf = (self.requestAnimationFrame || Object)(frame);
+					for (let i=p.length; i--; ) queueUpdate(p[i]);
 				};
 				frame();
 			}
