@@ -481,7 +481,7 @@ function maybeUpdateElement(element) {
 	if (element.$$paintObservedProperties && !element.$$needsOverrides) {
 		for (let i=0; i<element.$$paintObservedProperties.length; i++) {
 			let prop = element.$$paintObservedProperties[i];
-			if (computed.getPropertyValue(prop).trim() !== element.$$paintedPropertyValues[prop].trim()) {
+			if (computed.getPropertyValue(prop).trim() !== element.$$paintedPropertyValues[prop]) {
 				updateElement(element, computed);
 				break;
 			}
@@ -509,8 +509,6 @@ const propertiesContainer = {
 	get(name) {
 		const def = CSS_PROPERTIES[name];
 		let v = def && def.inherits === false ? currentElement.style.getPropertyValue(name) : propertiesContainer.getRaw(name);
-		// Safari returns whitespace around values:
-		if (typeof v === 'string') v = v.trim();
 		if (v == null && def) v = def.initialValue;
 		else if (def && def.syntax) {
 			const s = def.syntax.replace(/[<>\s]/g, '');
@@ -520,7 +518,10 @@ const propertiesContainer = {
 	},
 	getRaw(name) {
 		if (name in propertyContainerCache) return propertyContainerCache[name];
-		return propertyContainerCache[name] = currentProperties.getPropertyValue(name);
+		let v = currentProperties.getPropertyValue(name);
+		// Safari returns whitespace around values:
+		if (typeof v === 'string') v = v.trim();
+		return propertyContainerCache[name] = v;
 	}
 };
 
