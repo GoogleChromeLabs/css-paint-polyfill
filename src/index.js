@@ -1004,7 +1004,6 @@ function init() {
 		'animationstart',
 		'transitionstart',
 		'transitionend',
-		'transitionrun',
 		'transitioncancel',
 		'mouseover',
 		'mouseout',
@@ -1018,6 +1017,25 @@ function init() {
 
 	function updateFromEvent(e) {
 		let t = e.target;
+		const type = e.type;
+		if (type === 'animationstart' || type === 'transitionstart') {
+			const s = this.$$paintAnimating = (this.$$paintAnimating || 0) + 1;
+			if (s === 1) {
+				// Firefox ~68 didn't support Event.path
+				const p = [];
+				do { if (t.nodeType === 1) p.push(t); } while ((t = t.parentNode));
+				let frame = () => {
+					if (!this.$$paintAnimating) return frame = null;
+					for (let i=p.length; i--; ) queueUpdate(p[i]);
+					this.$$paintRaf = (self.requestAnimationFrame || Object)(frame);
+				};
+				frame();
+			}
+			return;
+		}
+		if ((type === 'animationend' || type === 'transitionend' || type === 'transitioncancel') && --this.$$paintAnimating === 0) {
+			(self.cancelAnimationFrame || Object)(this.$$paintRaf);
+		}
 		while (t) {
 			if (t.nodeType === 1) queueUpdate(t);
 			t = t.parentNode;
