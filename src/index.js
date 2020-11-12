@@ -450,11 +450,11 @@ function ensurePaintId(element) {
 function getPaintRuleForElement(element) {
 	let paintRule = element.$$paintRule,
 		paintId = ensurePaintId(element);
-	if (paintRule==null) {
 		// Fix cloned DOM trees which can have incorrect data-css-paint attributes:
 		if (Number(element.getAttribute('data-css-paint')) !== paintId) {
 			element.setAttribute('data-css-paint', paintId);
 		}
+	if (paintRule==null) {
 		let index = overrideStyles.insertRule(`[data-css-paint="${paintId}"] {}`, overrideStyles.cssRules.length);
 		paintRule = element.$$paintRule = overrideStyles.cssRules[index];
 	}
@@ -486,13 +486,21 @@ function maybeUpdateElement(element) {
 				break;
 			}
 		}
+		element.$$paintPending = false;
+		return;
 	}
-	else if (element.$$paintId || HAS_PAINT.test(getCssText(computed))) {
+
+	if (element.$$paintId || HAS_PAINT.test(getCssText(computed))) {
 		updateElement(element, computed);
 		return;
 	}
 
-	element.$$paintPending = false;
+	// first time we've seen this element, and it has a style attribute with unparsed paint rules.
+	const styleAttr = element.getAttribute('style');
+	if (HAS_PAINT.test(styleAttr)) {
+		element.style.cssText = styleAttr.replace(/;\s*$/, '') + '; ' + element.style.cssText;
+		updateElement(element);
+	}
 }
 
 // Invalidate any cached geometry and enqueue an update
