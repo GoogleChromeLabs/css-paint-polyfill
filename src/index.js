@@ -341,8 +341,28 @@ function processNewSheet(node) {
 }
 
 function processRemoteSheet(css) {
-	const sheet = parseCss(escapePaintRules(css));
+	let sheet = parseCss(escapePaintRules(css));
 
+	// In Firefox, accessing .cssRules in a stylesheet with pending @import rules fails.
+	// Try to wait for them to resolve, otherwise try again after a long delay.
+	try {
+		sheet.cssRules.length;
+	}
+	catch (e) {
+		let next = () => {
+			if (sheet) processRemoteSheetRules(sheet);
+			sheet = null;
+			clearTimeout(timer);
+		};
+		sheet.ownerNode.onload = sheet.ownerNode.onerror = next;
+		let timer = setTimeout(next, 5000);
+		return;
+	}
+
+	processRemoteSheetRules(sheet);
+}
+
+function processRemoteSheetRules(sheet) {
 	let newSheet = '';
 	walkStyles(sheet, (rule) => {
 		if (rule.type !== 1) return;
@@ -450,10 +470,10 @@ function ensurePaintId(element) {
 function getPaintRuleForElement(element) {
 	let paintRule = element.$$paintRule,
 		paintId = ensurePaintId(element);
-		// Fix cloned DOM trees which can have incorrect data-css-paint attributes:
-		if (Number(element.getAttribute('data-css-paint')) !== paintId) {
-			element.setAttribute('data-css-paint', paintId);
-		}
+	// Fix cloned DOM trees which can have incorrect data-css-paint attributes:
+	if (Number(element.getAttribute('data-css-paint')) !== paintId) {
+		element.setAttribute('data-css-paint', paintId);
+	}
 	if (paintRule==null) {
 		let index = overrideStyles.insertRule(`[data-css-paint="${paintId}"] {}`, overrideStyles.cssRules.length);
 		paintRule = element.$$paintRule = overrideStyles.cssRules[index];
