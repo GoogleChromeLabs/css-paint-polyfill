@@ -345,8 +345,10 @@ function processRemoteSheet(css) {
 
 	// In Firefox, accessing .cssRules in a stylesheet with pending @import rules fails.
 	// Try to wait for them to resolve, otherwise try again after a long delay.
+	// eslint-disable-next-line no-unused-vars
+	let rules;
 	try {
-		sheet.cssRules.length;
+		rules = sheet.cssRules.length;
 	}
 	catch (e) {
 		let next = () => {
