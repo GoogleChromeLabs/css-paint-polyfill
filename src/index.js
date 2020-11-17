@@ -627,6 +627,10 @@ function updateElement(element, computedStyle) {
 			paintId,
 			token,
 			geom = elementGeometry;
+		
+		if (property !== 'background' && property !== 'background-image' && property !== 'border-image') {
+			continue;
+		}
 
 		// Support CSS Border Images
 		if (/border-image/.test(property)) {
