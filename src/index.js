@@ -898,9 +898,9 @@ function init() {
 		if (lock===true || overrideLocks) return;
 		lock = true;
 		for (let i = 0; i < records.length; i++) {
-			let record = records[i], added, removed;
+			let record = records[i], target = record.target, added, removed;
 			// Ignore all inline SVG mutations:
-			if (record.target && 'ownerSVGElement' in record.target) {
+			if (target && 'ownerSVGElement' in target) {
 				continue;
 			}
 			if (record.type === 'childList') {
@@ -923,14 +923,20 @@ function init() {
 					}
 				}
 			}
-			else if (record.type==='attributes' && record.target.nodeType === 1) {
-				walk(record.target, invalidateElementGeometry);
+			else if (record.type==='attributes' && target.nodeType === 1) {
+				// prevent removal of data-css-paint attribute
+				if (record.attributeName === 'data-css-paint' && record.oldValue && target.$$paintId != null && !target.getAttribute('data-css-paint')) {
+					ensurePaintId(target);
+					continue;
+				}
+				walk(target, invalidateElementGeometry);
 			}
 		}
 		lock = false;
 	}).observe(document.body, {
 		childList: true,
 		attributes: true,
+		attributeOldValue: true,
 		subtree: true
 	});
 
@@ -946,6 +952,15 @@ function init() {
 		return oldSetAttribute.call(this, name, value);
 	};
 	defineProperty(Element.prototype, 'setAttribute', setAttributeDesc);
+
+	// avoid frameworks removing the data-css-paint attribute:
+	const removeAttributeDesc = Object.getOwnPropertyDescriptor(Element.prototype, 'removeAttribute');
+	const oldRemoveAttribute = removeAttributeDesc.value;
+	removeAttributeDesc.value = function(name) {
+		if (name === 'data-css-paint') return;
+		return oldRemoveAttribute.call(this, name);
+	};
+	defineProperty(Element.prototype, 'removeAttribute', removeAttributeDesc);
 
 	let styleDesc = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'style');
 	const oldStyleGetter = styleDesc.get;
