@@ -101,7 +101,7 @@ const HAS_PAINT = /(paint\(|-moz-element\(#paint-|-webkit-canvas\(paint-|[('"]bl
 const USE_CSS_CANVAS_CONTEXT = 'getCSSCanvasContext' in document;
 const USE_CSS_ELEMENT = (testStyles.backgroundImage = `-moz-element(#${GLOBAL_ID})`) === testStyles.backgroundImage;
 const HAS_PROMISE = (typeof Promise === 'function');
-testStyles.cssText = 'display:inline-block;width:1px;height:1px;opacity:0.01;overflow:hidden;';
+testStyles.cssText = 'display:none !important;';
 
 let defer = window.requestAnimationFrame || setTimeout;
 let getDevicePixelRatio = () => window.devicePixelRatio || 1;
@@ -885,7 +885,8 @@ PaintWorklet.prototype.addModule = function(url) {
 			get: getDevicePixelRatio
 		});
 		context.self = context;
-		let realm = new Realm(context, root);
+		let parent = styleIsolationFrame.contentDocument && styleIsolationFrame.contentDocument.body || root;
+		let realm = new Realm(context, parent);
 
 		code = (this.transpile || String)(code);
 
