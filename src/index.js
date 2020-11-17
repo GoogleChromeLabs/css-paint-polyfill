@@ -78,7 +78,6 @@ if (!supportsPaintWorklet) {
 const GLOBAL_ID = 'css-paint-polyfill';
 
 let root = document.createElement(GLOBAL_ID);
-root.style.cssText = 'display: none;';
 if (!supportsPaintWorklet) {
 	document.documentElement.appendChild(root);
 }
@@ -102,7 +101,7 @@ const HAS_PAINT = /(paint\(|-moz-element\(#paint-|-webkit-canvas\(paint-|[('"]bl
 const USE_CSS_CANVAS_CONTEXT = 'getCSSCanvasContext' in document;
 const USE_CSS_ELEMENT = (testStyles.backgroundImage = `-moz-element(#${GLOBAL_ID})`) === testStyles.backgroundImage;
 const HAS_PROMISE = (typeof Promise === 'function');
-testStyles.cssText = '';
+testStyles.cssText = 'display:inline-block;width:1px;height:1px;opacity:0.01;overflow:hidden;';
 
 let defer = window.requestAnimationFrame || setTimeout;
 let getDevicePixelRatio = () => window.devicePixelRatio || 1;
