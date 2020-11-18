@@ -579,10 +579,10 @@ const resizeObserver = window.ResizeObserver && new window.ResizeObserver((entri
 		else {
 			// contentRect is the content box, so we add padding to get border-box:
 			const computed = getComputedStyle(entry.target);
-			const paddingY = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
 			const paddingX = parseFloat(computed.paddingLeft) + parseFloat(computed.paddingRight);
-			geom.width = Math.round(((entry.contentRect.right + entry.contentRect.left) || entry.contentRect.width) + paddingX);
-			geom.height = Math.round(((entry.contentRect.bottom + entry.contentRect.top) || entry.contentRect.height) + paddingY);
+			const paddingY = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
+			geom.width = Math.round(((entry.contentRect.right - entry.contentRect.left) || entry.contentRect.width) + paddingX);
+			geom.height = Math.round(((entry.contentRect.bottom - entry.contentRect.top) || entry.contentRect.height) + paddingY);
 		}
 		queueUpdate(entry.target, true);
 	}
