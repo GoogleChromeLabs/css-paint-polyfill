@@ -567,13 +567,14 @@ const resizeObserver = window.ResizeObserver && new window.ResizeObserver((entri
 	for (let i=0; i<entries.length; i++) {
 		const entry = entries[i];
 		let geom = entry.target.$$paintGeometry;
-		if (!geom) {
-			geom = entry.target.$$paintGeometry = { width: 0, height: 0, live: true };
-		}
-		geom.live = true;
-		if (entry.borderBoxSize && entry.borderBoxSize.length) {
-			geom.width = entry.borderBoxSize[0].inlineSize | 0;
-			geom.height = entry.borderBoxSize[0].blockSize | 0;
+		if (geom) geom.live = true;
+		else geom = entry.target.$$paintGeometry = { width: 0, height: 0, live: true };
+		let bbox = entry.borderBoxSize;
+		// Firefox returns a single borderBoxSize object, Chrome returns an Array of them:
+		if (bbox && bbox.length) bbox = bbox[0];
+		if (bbox) {
+			geom.width = bbox.inlineSize | 0;
+			geom.height = bbox.blockSize | 0;
 		}
 		else {
 			// contentRect is the content box, so we add padding to get border-box:
