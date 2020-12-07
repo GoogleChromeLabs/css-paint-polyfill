@@ -545,6 +545,8 @@ const propertiesContainer = {
 			const s = def.syntax.replace(/[<>\s]/g, '');
 			if (typeof CSS[s] === 'function') v = CSS[s](v);
 		}
+		// Safari returns whitespace around values:
+		if (typeof v === 'string') v = v.trim();
 		return v;
 	},
 	getRaw(name) {
