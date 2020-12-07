@@ -64,6 +64,8 @@ CSSUnitValue.prototype.valueOf = function() {
 	}
 });
 
+// Matches CSS properties that can accept a paint() value:
+const IMAGE_CSS_PROPERTIES = /(background|mask|cursor|-image|-source)/;
 
 const supportsPaintWorklet = !!CSS.paintWorklet;
 if (!supportsPaintWorklet) {
@@ -629,7 +631,7 @@ function updateElement(element, computedStyle) {
 			token,
 			geom = elementGeometry;
 		
-		if (property !== 'background' && property !== 'background-image' && property !== 'border-image') {
+		if (!IMAGE_CSS_PROPERTIES.test(property)) {
 			continue;
 		}
 
@@ -1002,7 +1004,8 @@ function init() {
 	};
 	propDescs.cssText = cssTextDesc;
 
-	['background', 'backgroundImage', 'borderImage'].forEach((prop) => {
+	const properties = Object.keys((window.CSS2Properties || CSSStyleDeclaration).prototype).filter(m => IMAGE_CSS_PROPERTIES.test(m));
+	properties.forEach((prop) => {
 		const n = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
 		propDescs[prop] = {
 			configurable: true,
