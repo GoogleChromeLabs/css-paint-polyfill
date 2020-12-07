@@ -631,13 +631,18 @@ function updateElement(element, computedStyle) {
 			hasPaints = false,
 			paintId,
 			token,
+			disableScaling = false,
 			geom = elementGeometry;
 		
 		if (!IMAGE_CSS_PROPERTIES.test(property)) {
 			continue;
 		}
 
+		// Ignore unnecessarily aliased vendor-prefixed properties:
+		if (property === '-webkit-border-image') continue;
+
 		// Support CSS Border Images
+		// NOTE: Safari cannot handle DPI-scaled border-image:-webkit-canvas(), so we disable HiDPI.
 		if (/border-image/.test(property)) {
 			let w = geom.width;
 			let h = geom.height;
@@ -648,12 +653,17 @@ function updateElement(element, computedStyle) {
 					.replace(/\sfill/, '')
 					.split(' ')
 			);
-			w -= applyDimensions(w, slice.left) + applyDimensions(w, slice.right);
-			h -= applyDimensions(h, slice.top) + applyDimensions(h, slice.bottom);
-
+			const borderWidth = parseCssDimensions(propertiesContainer.getRaw('border-width').split(' '));
 			const outset = parseCssDimensions(propertiesContainer.getRaw('border-image-outset').split(' '));
-			w = applyDimensions(applyDimensions(w, outset.left), outset.right);
-			h = applyDimensions(applyDimensions(h, outset.top), outset.bottom);
+
+			// Add the outside to dimensions, which is a multiple/percentage of each border width:
+			// Note: this must first omit any sides that have been sliced to 0px.
+			w += applyDimensions(slice.left != '0' && parseFloat(borderWidth.left) || 0, outset.left || 0, true);
+			w += applyDimensions(slice.right != '0' && parseFloat(borderWidth.right) || 0, outset.right || 0, true);
+			h += applyDimensions(slice.top != '0' && parseFloat(borderWidth.top) || 0, outset.top || 0, true);
+			h += applyDimensions(slice.bottom != '0' && parseFloat(borderWidth.bottom) || 0, outset.bottom || 0, true);
+
+			disableScaling = true;
 
 			geom = { width: w, height: h };
 		}
@@ -669,7 +679,7 @@ function updateElement(element, computedStyle) {
 			let currentUri = token[3];
 			let painter = getPainter(painterName);
 			let contextOptions = painter && painter.Painter.contextOptions || {};
-			let equivalentDpr = contextOptions.scaling === false ? 1 : dpr;
+			let equivalentDpr = disableScaling || contextOptions.scaling === false ? 1 : dpr;
 
 			let inst;
 			if (painter) {
@@ -808,6 +818,20 @@ function updateElement(element, computedStyle) {
 				applyStyleRule(paintRule.style, 'background-size', `100% 100%`);
 			}
 
+			if (/mask/.test(property) && dpr !== 1) {
+				applyStyleRule(paintRule.style, 'mask-size', 'contain');
+				// cheat: "if this is Safari"
+				if (USE_CSS_CANVAS_CONTEXT) {
+					applyStyleRule(paintRule.style, '-webkit-mask-size', 'contain');
+				}
+			}
+
+			// `border-color:transparent` in Safari overrides border-image
+			if (/border-image/.test(property) && USE_CSS_CANVAS_CONTEXT) {
+				applyStyleRule(paintRule.style, 'border-color', 'initial');
+				applyStyleRule(paintRule.style, 'image-rendering', 'optimizeSpeed'); // -webkit-crisp-edges
+			}
+
 			if (urls.length===0) {
 				applyStyleRule(paintRule.style, property, newValue);
 			}
@@ -852,10 +876,11 @@ function applyStyleRule(style, property, value) {
 }
 
 // apply a dimension offset to a base unit value (used for computing border-image sizes)
-function applyDimensions(base, dim) {
+function applyDimensions(base, dim, omitBase) {
+	const r = omitBase ? 0 : base;
 	let v = parseFloat(dim);
-	if (!dim) return base;
-	if (dim.match('px')) return base + v;
+	if (!dim) return r;
+	if (dim.match('px')) return r + v;
 	if (dim.match('%')) v /= 100;
 	return base * v;
 }
