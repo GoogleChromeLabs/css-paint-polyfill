@@ -501,6 +501,7 @@ function getCssText(style) {
 
 function maybeUpdateElement(element) {
 	let computed = getComputedStyle(element);
+
 	if (element.$$paintObservedProperties && !element.$$needsOverrides) {
 		for (let i=0; i<element.$$paintObservedProperties.length; i++) {
 			let prop = element.$$paintObservedProperties[i];
@@ -509,21 +510,18 @@ function maybeUpdateElement(element) {
 				break;
 			}
 		}
-		element.$$paintPending = false;
-		return;
-	}
-
-	if (element.$$paintId || HAS_PAINT.test(getCssText(computed))) {
+	} else if (element.$$paintId || HAS_PAINT.test(getCssText(computed))) {
 		updateElement(element, computed);
-		return;
+	} else {
+		// first time we've seen this element, and it has a style attribute with unparsed paint rules.
+		const styleAttr = element.getAttribute('style');
+		if (HAS_PAINT.test(styleAttr)) {
+			element.style.cssText = styleAttr.replace(/;\s*$/, '') + '; ' + element.style.cssText;
+			updateElement(element);
+		}
 	}
 
-	// first time we've seen this element, and it has a style attribute with unparsed paint rules.
-	const styleAttr = element.getAttribute('style');
-	if (HAS_PAINT.test(styleAttr)) {
-		element.style.cssText = styleAttr.replace(/;\s*$/, '') + '; ' + element.style.cssText;
-		updateElement(element);
-	}
+	element.$$paintPending = false;
 }
 
 // Invalidate any cached geometry and enqueue an update
