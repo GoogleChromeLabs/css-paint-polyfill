@@ -35,8 +35,8 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "concurrently": "^3.5.1",
-    "eslint": "^4.17.0",
-    "eslint-config-developit": "^1.1.1",
+    "eslint": "^7.29.0",
+    "eslint-config-developit": "^1.2.0",
     "gh-pages": "^1.1.0",
     "microbundle": "^0.5.1",
     "serve": "^11.3.0",
