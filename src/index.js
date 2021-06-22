@@ -205,7 +205,9 @@ function update() {
 			toRemove: [],
 			counters: {},
 			isNew: false,
-			sheetId: null
+			sheetId: null,
+			// this property is unused - it's assigned to in order to prevent Terser from removing the try/catch on L220
+			rules: null
 		},
 		invalidateAll;
 
@@ -214,10 +216,8 @@ function update() {
 		if (node.$$isPaint) continue;
 
 		// Check that we can access the sheet.
-		// The rules binding is required in order to prevent Terser from removing the block.
-		// eslint-disable-next-line no-unused-vars
-		let rules;
-		try { rules = node.sheet.cssRules; }
+		// (assigning to `context.rules` prevents Terser from removing the block)
+		try { context.rules = node.sheet.cssRules; }
 		catch (e) { continue; }
 
 		context.sheetId = node.$$paintid;
@@ -346,10 +346,8 @@ function processRemoteSheet(css) {
 
 	// In Firefox, accessing .cssRules in a stylesheet with pending @import rules fails.
 	// Try to wait for them to resolve, otherwise try again after a long delay.
-	// eslint-disable-next-line no-unused-vars
-	let rules;
 	try {
-		rules = sheet.cssRules.length;
+		sheet._ = sheet.cssRules.length;
 	}
 	catch (e) {
 		let next = () => {
@@ -510,9 +508,11 @@ function maybeUpdateElement(element) {
 				break;
 			}
 		}
-	} else if (element.$$paintId || HAS_PAINT.test(getCssText(computed))) {
+	}
+	else if (element.$$paintId || HAS_PAINT.test(getCssText(computed))) {
 		updateElement(element, computed);
-	} else {
+	}
+	else {
 		// first time we've seen this element, and it has a style attribute with unparsed paint rules.
 		const styleAttr = element.getAttribute('style');
 		if (HAS_PAINT.test(styleAttr)) {
