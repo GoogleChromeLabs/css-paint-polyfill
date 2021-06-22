@@ -1068,11 +1068,9 @@ function init() {
 		Object.defineProperties(window.CSS2Properties.prototype, propDescs);
 	}
 
-	if (!resizeObserver) {
-		addEventListener('resize', () => {
-			processItem('[data-css-paint]', true);
-		});
-	}
+	addEventListener('resize', () => {
+		processItem('[data-css-paint]');
+	});
 
 	const OPTS = { passive: true };
 
