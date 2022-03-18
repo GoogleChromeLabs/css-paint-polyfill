@@ -1100,8 +1100,8 @@ function init() {
 		}
 	}
 
-	processItem('[style*="paint"]');
 	update();
+	processItem('[style*="paint"]');
 }
 
 if (!supportsPaintWorklet) {
