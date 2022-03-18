@@ -1100,6 +1100,7 @@ function init() {
 		}
 	}
 
+	processItem('[style*="paint"]');
 	update();
 }
 
