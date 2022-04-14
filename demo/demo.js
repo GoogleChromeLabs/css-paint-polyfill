@@ -31,17 +31,20 @@ if (p) {
 
 if (!window.performance) window.performance = { now: Date.now.bind(Date) };
 
-if (!window.requestAnimationFrame) window.requestAnimationFrame = function(cb) { return setTimeout(doAnim, cb); };
+if (!window.requestAnimationFrame) {
+	window.requestAnimationFrame = function(cb) { return setTimeout(doAnim, 16, cb); };
+	window.cancelAnimationFrame = function(req) { clearTimeout(req); }
+}
 function doAnim(cb) { cb(performance.now()); }
 
-function ripple(evt) {
-	var button = this,
+function ripple(button, evt) {
+	var request,
 		rect = button.getBoundingClientRect(),
 		x = evt.clientX - rect.left,
 		y = evt.clientY - rect.top,
 		start = performance.now();
 	button.classList.add('animating');
-	requestAnimationFrame(function raf(now) {
+	request = requestAnimationFrame(function raf(now) {
 		var count = Math.floor(now - start);
 		button.style.cssText = '--ripple-x: ' + x + '; --ripple-y: ' + y + '; --animation-tick: ' + count + ';';
 		if (count > 1000) {
@@ -49,9 +52,18 @@ function ripple(evt) {
 			button.style.cssText = '--animation-tick: 0;';
 			return;
 		}
-		requestAnimationFrame(raf);
-	})
+		request = requestAnimationFrame(raf);
+	});
+	return function () {
+		cancelAnimationFrame(request);
+	}
 }
 [].forEach.call(document.querySelectorAll('.ripple'), function (el) {
-	el.addEventListener('click', ripple);
+	var cancelRipple;
+	el.addEventListener('click', function (evt) {
+		if (cancelRipple) {
+			cancelRipple();
+		}
+		cancelRipple = ripple(this, evt);
+	});
 });
