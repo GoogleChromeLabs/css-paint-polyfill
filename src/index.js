@@ -41,9 +41,12 @@ if (!CSS.escape) CSS.escape = s => s.replace(/([^\w-])/g,'\\$1');
 
 /** @type {{ [name: string]: { name: string, syntax: string, inherits: boolean, initialValue: string }} } */
 const CSS_PROPERTIES = {};
-if (!CSS.registerProperty) CSS.registerProperty = function (def) {
+let registerPropertyDefault = CSS.registerProperty;
+CSS.registerProperty = function (def) {
 	CSS_PROPERTIES[def.name] = def;
-};
+	if (registerPropertyDefault)
+		registerPropertyDefault(def);
+}
 
 // Minimal poorlyfill for CSS properties+values
 function CSSUnitValue(value, unit) {
@@ -537,7 +540,8 @@ const propertiesContainer = {
 	// .get() is used by worklets
 	get(name) {
 		const def = CSS_PROPERTIES[name];
-		let v = def && def.inherits === false ? currentElement.style.getPropertyValue(name) : propertiesContainer.getRaw(name);
+		const computed = getComputedStyle(currentElement);
+		let v = computed.getPropertyValue(name);
 		if (v == null && def) v = def.initialValue;
 		else if (def && def.syntax) {
 			const s = def.syntax.replace(/[<>\s]/g, '');
@@ -966,7 +970,7 @@ function init() {
 			}
 		}
 		lock = false;
-	}).observe(document.body, {
+	}).observe(document.documentElement, {
 		childList: true,
 		attributes: true,
 		attributeOldValue: true,
@@ -1080,7 +1084,6 @@ function init() {
 		'animationstart',
 		'transitionstart',
 		'transitionend',
-		'transitionrun',
 		'transitioncancel',
 		'mouseover',
 		'mouseout',
@@ -1094,6 +1097,25 @@ function init() {
 
 	function updateFromEvent(e) {
 		let t = e.target;
+		const type = e.type;
+		if (type === 'animationstart' || type === 'transitionstart') {
+			const s = this.$$paintAnimating = (this.$$paintAnimating || 0) + 1;
+			if (s === 1) {
+				// Firefox ~68 didn't support Event.path
+				const p = [];
+				do { if (t.nodeType === 1) p.push(t); } while ((t = t.parentNode));
+				let frame = () => {
+					if (!this.$$paintAnimating) return frame = null;
+					for (let i=p.length; i--; ) queueUpdate(p[i]);
+					this.$$paintRaf = (self.requestAnimationFrame || Object)(frame);
+				};
+				frame();
+			}
+			return;
+		}
+		if ((type === 'animationend' || type === 'transitionend' || type === 'transitioncancel') && --this.$$paintAnimating === 0) {
+			(self.cancelAnimationFrame || Object)(this.$$paintRaf);
+		}
 		while (t) {
 			if (t.nodeType === 1) queueUpdate(t);
 			t = t.parentNode;
