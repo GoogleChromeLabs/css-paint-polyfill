@@ -540,7 +540,8 @@ const propertiesContainer = {
 	// .get() is used by worklets
 	get(name) {
 		const def = CSS_PROPERTIES[name];
-		let v = def && def.inherits === false ? currentElement.style.getPropertyValue(name) : propertiesContainer.getRaw(name);
+		const computed = getComputedStyle(currentElement);
+		let v = computed.getPropertyValue(name);
 		if (v == null && def) v = def.initialValue;
 		else if (def && def.syntax) {
 			const s = def.syntax.replace(/[<>\s]/g, '');
