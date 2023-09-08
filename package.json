@@ -34,12 +34,14 @@
   "author": "Google Chrome Developers <chromium-dev@google.com>",
   "license": "Apache-2.0",
   "devDependencies": {
-    "concurrently": "^3.5.1",
-    "eslint": "^7.29.0",
+    "concurrently": "^8.2.1",
+    "eslint": "^8.48.0",
     "eslint-config-developit": "^1.2.0",
-    "gh-pages": "^1.1.0",
-    "microbundle": "^0.5.1",
-    "serve": "^11.3.0",
-    "transpiler-lite": "gist:781ef9620da8a30228b9f0c6e21fa7f6"
+    "gh-pages": "^6.0.0",
+    "microbundle": "^0.15.1",
+    "serve": "^14.2.1"
+  },
+  "dependencies": {
+    "transpiler-lite": "git+https://gist.github.com/781ef9620da8a30228b9f0c6e21fa7f6.git"
   }
 }
