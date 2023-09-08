@@ -41,9 +41,12 @@ if (!CSS.escape) CSS.escape = s => s.replace(/([^\w-])/g,'\\$1');
 
 /** @type {{ [name: string]: { name: string, syntax: string, inherits: boolean, initialValue: string }} } */
 const CSS_PROPERTIES = {};
-if (!CSS.registerProperty) CSS.registerProperty = function (def) {
+let registerPropertyDefault = CSS.registerProperty;
+CSS.registerProperty = function (def) {
 	CSS_PROPERTIES[def.name] = def;
-};
+	if (registerPropertyDefault)
+		registerPropertyDefault(def);
+}
 
 // Minimal poorlyfill for CSS properties+values
 function CSSUnitValue(value, unit) {
