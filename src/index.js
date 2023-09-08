@@ -966,7 +966,7 @@ function init() {
 			}
 		}
 		lock = false;
-	}).observe(document.body, {
+	}).observe(document.documentElement, {
 		childList: true,
 		attributes: true,
 		attributeOldValue: true,
